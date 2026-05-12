@@ -41,7 +41,7 @@ const CATEGORIES = [
   'Other',
 ];
 
-const CONDITIONS = ['Like New', 'Good', 'Fair', 'Poor'];
+const CONDITIONS = ['Brand New', 'Like New', 'Good', 'Fair', 'Poor'];
 
 const ALL_PLATFORMS: Platform[] = ['Rednote', 'Facebook', 'eBay'];
 

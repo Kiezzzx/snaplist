@@ -116,7 +116,11 @@ export function ListingEditor({
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center py-24">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#E8421A] mb-4">
-              Generation failed. Please try again.
+              {error.message.toLowerCase().includes('429') ||
+             error.message.toLowerCase().includes('quota') ||
+             error.message.toLowerCase().includes('rate')
+              ? 'Rate limit reached. Please wait and try again.'
+              : 'Generation failed. Please try again.'}
             </p>
             <button
               onClick={() => {

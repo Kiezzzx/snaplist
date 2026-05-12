@@ -80,10 +80,15 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ success: true, data });
   } catch (error) {
     console.error('Extract API error:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error occurred';
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
+      return Response.json(
+        { success: false, error: 'Rate limit exceeded. Please try again later.' },
+        { status: 429 }
+      );
+    }
     return Response.json(
-      { success: false, error: errorMessage },
+      { success: false, error: msg || 'Unknown error occurred' },
       { status: 500 }
     );
   }

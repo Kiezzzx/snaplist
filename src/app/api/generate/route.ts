@@ -115,9 +115,44 @@ Write the listing now.`;
       prompt: fullPrompt,
     });
 
-    return result.toTextStreamResponse();
+    // Await the first token before committing to HTTP 200.
+    // If Gemini returns 429 or another API error, it throws here and
+    // the outer catch returns a proper HTTP error response.
+    const iter = result.textStream[Symbol.asyncIterator]() as AsyncIterator<string>;
+    const first = await iter.next();
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          if (!first.done) {
+            controller.enqueue(encoder.encode(first.value));
+          }
+          for (;;) {
+            const chunk = await iter.next();
+            if (chunk.done) break;
+            controller.enqueue(encoder.encode(chunk.value));
+          }
+        } catch {
+          // mid-stream error — response already started, just close
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
   } catch (error) {
     console.error('Generate API error:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
+      return Response.json(
+        { error: 'Rate limit exceeded. Please wait and try again.' },
+        { status: 429 }
+      );
+    }
     return Response.json(
       { error: 'Generation failed' },
       { status: 500 }
