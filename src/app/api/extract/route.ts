@@ -16,7 +16,6 @@ const productMetadataSchema = z.object({
     const cleaned = val.replace(/[^0-9.]/g, '');
     return cleaned || '';
   }),
-  notes: z.string(),
 });
 
 const systemPrompt = `You are an expert second-hand goods appraiser.
@@ -75,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
       ],
     });
 
-    const data: Partial<ProductMetadata> = object;
+    const data: Partial<ProductMetadata> = { ...object, notes: '' };
 
     return Response.json({ success: true, data });
   } catch (error) {

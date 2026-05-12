@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ProductMetadata, DirtyState, Platform } from '@/lib/types';
 
 interface MetadataFormProps {
@@ -55,6 +55,14 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
   ]);
   const [showSuggested, setShowSuggested] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = notesRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [form.notes]);
 
   // Sync AI-extracted data to form fields that user hasn't manually edited
   useEffect(() => {
@@ -216,21 +224,29 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
         </div>
 
         {/* Notes */}
-        <div>
+        <div className="mb-0">
           <label htmlFor="notes" className={labelClassName}>
             NOTES
           </label>
           <textarea
+            ref={notesRef}
             id="notes"
+            rows={1}
+            style={{ minHeight: '24px' }}
             value={form.notes}
             onChange={(e) => handleChange('notes', e.target.value)}
-            className="min-h-[80px] w-full resize-none border-0 border-b-2 border-black bg-transparent pb-2 text-sm focus:border-[#E8421A] focus:outline-none"
-            placeholder="Additional details about the item..."
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = `${target.scrollHeight}px`;
+            }}
+            className="w-full resize-none overflow-hidden border-0 border-b-2 border-black bg-transparent pb-2 text-sm focus:border-[#E8421A] focus:outline-none"
+            placeholder="e.g. Pick up only · Cash preferred · Includes original box · Open to offers"
           />
         </div>
 
         {/* Platform Selection */}
-        <div className="border-t border-[#D0CFC9] pt-8">
+        <div className="mt-4! border-t border-[#D0CFC9] pt-6">
           <label className={labelClassName}>OUTPUT PLATFORMS</label>
           <div className="flex flex-wrap gap-2">
             {ALL_PLATFORMS.map((platform) => {
