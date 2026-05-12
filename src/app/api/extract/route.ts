@@ -1,4 +1,5 @@
-import { openai } from '@ai-sdk/openai';
+
+import { google } from '@ai-sdk/google';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { ProductMetadata } from '@/lib/types';
@@ -10,14 +11,22 @@ const productMetadataSchema = z.object({
   brand: z.string(),
   model: z.string(),
   condition: z.string(),
-  suggestedPrice: z.string(),
+  suggestedPrice: z.string().transform((val) => {
+    // Strip any non-numeric characters except decimal
+    const cleaned = val.replace(/[^0-9.]/g, '');
+    return cleaned || '';
+  }),
   notes: z.string(),
 });
 
 const systemPrompt = `You are an expert second-hand goods appraiser.
 Analyze the image and extract product details.
-For suggestedPrice, estimate a fair second-hand
-market price in AUD based on condition.
+
+For suggestedPrice: Research typical second-hand market value in Australia (AUD).
+Return ONLY a number like '150' or '299'.
+No currency symbols, no ranges like '100-200', just a single number.
+If truly unknown, return empty string.
+
 Return empty string for any field you are unsure about.
 Never guess brand or model if not clearly visible.`;
 
@@ -45,23 +54,17 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    // Strip data URL prefix before sending to OpenAI
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-
     const { object } = await generateObject({
-      model: openai('gpt-4o'),
+      model: google('gemini-2.5-flash'),
+      system: systemPrompt,
       schema: productMetadataSchema,
       messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
         {
           role: 'user',
           content: [
             {
               type: 'image',
-              image: base64Data,
+              image: imageBase64,
             },
             {
               type: 'text',
@@ -76,6 +79,7 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json({ success: true, data });
   } catch (error) {
+    console.error('Extract API error:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error occurred';
     return Response.json(

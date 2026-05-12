@@ -24,20 +24,39 @@ export function ListingEditor({
   onStatusChange,
 }: ListingEditorProps) {
   const [copied, setCopied] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
-  const { completion, complete, stop, isLoading, error } = useCompletion({
+  const { completion, complete, stop, isLoading, error, setCompletion } = useCompletion({
     api: '/api/generate',
     body: { platform },
+    streamProtocol: 'text',
     onFinish: () => onStatusChange(platform, 'success'),
-    onError: () => onStatusChange(platform, 'error'),
+    onError: (err) => {
+      console.error(platform + ': error', err);
+      onStatusChange(platform, 'error');
+    },
   });
 
   useEffect(() => {
     if (triggerId <= 0 || !metadata) return;
+    console.log(`${platform}: triggering generation`, { triggerId, metadata });
+
+    // Track if this is a regeneration (already has content)
+    if (completion) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsRegenerating(true);
+      setCompletion(''); // Clear previous content
+    }
+
     stop();
-    const metadataString = JSON.stringify(metadata);
-    complete(metadataString);
     onStatusChange(platform, 'loading');
+    complete(JSON.stringify(metadata)).then(() => {
+      console.log(`${platform}: complete() resolved`);
+      setIsRegenerating(false);
+    }).catch((err) => {
+      console.error(`${platform}: complete() failed`, err);
+      setIsRegenerating(false);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerId]);
 
@@ -48,63 +67,105 @@ export function ListingEditor({
   }
 
   return (
-    <div className="relative flex h-96 flex-col border-t border-[#D0CFC9]">
-      {/* Decorative large number */}
-      <span className="pointer-events-none absolute right-0 top-0 text-[120px] font-black leading-none text-gray-100">
-        {platformNumbers[platform]}
-      </span>
-
+    <div className="relative min-h-[600px] border-t border-[#D0CFC9] pt-6">
       {/* Header */}
-      <div className="flex items-center justify-between py-4">
-        <h3 className="text-[10px] uppercase tracking-[0.3em] text-gray-400">
-          {platform}
-        </h3>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="text-3xl font-black text-gray-200">{platformNumbers[platform]}</span>
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
+                Platform
+              </p>
+              <p className="text-base font-bold uppercase tracking-tight">{platform}</p>
+            </div>
+          </div>
+        </div>
         <button
           onClick={handleCopy}
           disabled={isLoading || !completion}
           className={`
-            border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition-colors
+            border px-4 py-2 font-mono text-[10px] uppercase tracking-widest transition-colors
             ${
               isLoading || !completion
-                ? 'cursor-not-allowed border-[#D0CFC9] text-gray-300'
+                ? 'cursor-not-allowed border-gray-200 text-gray-300'
                 : copied
-                  ? 'border-[#0A0A0A] bg-[#0A0A0A] text-white'
-                  : 'border-[#0A0A0A] bg-transparent text-[#0A0A0A] hover:bg-[#0A0A0A] hover:text-white'
+                  ? 'border-[#E8421A] bg-[#E8421A] text-white'
+                  : 'border-gray-300 bg-transparent text-gray-600 hover:border-black hover:text-black'
             }
           `}
         >
-          {copied ? 'COPIED' : 'COPY'}
+          {copied ? 'Copied!' : 'Copy'}
         </button>
       </div>
 
       {/* Content area */}
-      <div className="relative flex-1 overflow-y-auto">
+      <div className="relative min-h-[500px]">
         {isLoading && !completion ? (
-          <div className="space-y-3">
-            <div className="h-3 w-3/4 animate-pulse bg-gray-200" />
-            <div className="h-3 w-full animate-pulse bg-gray-200" />
-            <div className="h-3 w-5/6 animate-pulse bg-gray-200" />
-            <div className="h-3 w-2/3 animate-pulse bg-gray-200" />
-            <p className="mt-6 text-[10px] uppercase tracking-[0.3em] text-gray-400">
-              GENERATING...
+          <div className="flex h-full flex-col items-center justify-center py-24">
+            {/* Loading animation */}
+            <div className="mb-6 flex gap-2">
+              <div className="h-2 w-2 animate-pulse bg-gray-400" style={{ animationDelay: '0ms' }} />
+              <div className="h-2 w-2 animate-pulse bg-gray-400" style={{ animationDelay: '150ms' }} />
+              <div className="h-2 w-2 animate-pulse bg-gray-400" style={{ animationDelay: '300ms' }} />
+            </div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-gray-400">
+              {isRegenerating ? 'Regenerating copy...' : 'Generating copy...'}
             </p>
           </div>
         ) : error ? (
-          <div className="flex h-full items-center">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-[#E8421A]">
-              FAILED TO GENERATE. PLEASE TRY AGAIN.
+          <div className="flex h-full flex-col items-center justify-center py-24">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#E8421A] mb-4">
+              Generation failed. Please try again.
             </p>
+            <button
+              onClick={() => {
+                if (metadata) {
+                  onStatusChange(platform, 'loading');
+                  complete(JSON.stringify(metadata)).catch(() => {
+                    onStatusChange(platform, 'error');
+                  });
+                }
+              }}
+              disabled={!metadata}
+              className="border border-[#E8421A] px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-[#E8421A] hover:bg-[#E8421A] hover:text-white transition-colors"
+            >
+              Retry
+            </button>
           </div>
         ) : completion ? (
-          <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-[#0A0A0A]">
-            {completion}
-          </p>
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center">
-            <span className="text-[120px] font-black leading-none text-gray-100">—</span>
-            <p className="mt-4 text-[10px] uppercase tracking-[0.3em] text-gray-300">
-              AWAITING GENERATION
+          <div className="relative">
+            <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-black">
+              {completion}
             </p>
+            {/* Status indicator */}
+            <div className="mt-6 flex items-center gap-2 border-t border-[#D0CFC9] pt-4">
+              <div className="h-2 w-2 bg-green-500" />
+              <span className="font-mono text-[8px] uppercase tracking-[0.2em] text-gray-400">
+                Generation complete — {completion.length} characters
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-12">
+            <div className="w-16 h-px bg-[#D0CFC9] mb-8" />
+            <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-3">
+              Awaiting Generation
+            </p>
+            <p className="text-xs text-gray-300 leading-relaxed max-w-[200px]">
+              Upload a photo and fill in item details, then click Generate
+            </p>
+            <div className="mt-8 flex gap-2">
+              {['REDNOTE', 'FACEBOOK', 'EBAY'].map((p) => (
+                <span
+                  key={p}
+                  className="text-[9px] tracking-widest text-gray-200 uppercase border border-[#E8E7E3] px-2 py-1"
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+            <div className="w-16 h-px bg-[#D0CFC9] mt-8" />
           </div>
         )}
       </div>

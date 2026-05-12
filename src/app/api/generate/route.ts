@@ -1,119 +1,126 @@
-import { openai } from '@ai-sdk/openai';
+import { google } from '@ai-sdk/google';
 import { streamText } from 'ai';
-import type { Platform, ProductMetadata } from '@/lib/types';
-
-const VALID_PLATFORMS: Platform[] = ['Rednote', 'Facebook', 'eBay'];
+import type { Platform } from '@/lib/types';
 
 const systemPrompts: Record<Platform, string> = {
-  Rednote: `You are a Chinese social media expert writing
-second-hand listing posts for Rednote (小红书).
-Write in Simplified Chinese. Use a warm,
-enthusiastic tone with relevant emojis.
+  Rednote: `You are an everyday overseas Chinese student/expat writing a Xiaohongshu (小红书) post to sell a personal second-hand item.
+Write entirely in Simplified Chinese.
 
-Example output format:
-🎧 出二手｜索尼降噪耳机 近全新
+[STYLE & TONE]
+- Natural, casual, and sincere. DO NOT sound like a marketer, a real estate agent, or an AI. 
+- Write like you are casually talking to a friend (e.g., "东西挺好的，就是用不上了所以出掉").
+- Use emojis NATURALLY and SPARINGLY. Do not overdo it. 
+- Avoid dramatic or overly exaggerated buzzwords. Keep the tone relaxed and authentic.
 
-✨ 入手没多久换成入耳式了 闲置出掉～
+[INPUT HANDLING & CONSTRAINTS]
+- Use the provided info (Brand, Model, Condition, Price, Notes). 
+- STRICT RULE: DO NOT hallucinate features or specs not mentioned.
+- If "Notes" has no reason for selling, invent a very normal, low-key reason (e.g., "换新了", "回国实在塞不下行李箱了", "闲置吃灰挺可惜的").
 
-【物品状态】
-→ 外观近全新，无明显划痕
-→ 功能完全正常
-→ 原装配件齐全
+[REQUIRED STRUCTURE]
+1. Title: Simple and clear (e.g., 出个闲置自用的 [Brand] [Model])
+2. Intro: 1-2 natural sentences explaining what it is and why you are selling it.
+3. Details: Honest description of the condition in plain language.
+4. Transaction: Clear price and logistics (Based heavily on the "Notes" field).
+5. Hashtags: 3-4 natural tags only.
 
-【为什么值得买】
-索尼旗舰降噪，市价AUD$350+
-现在捡漏价💸
+Output ONLY the listing content. No conversational filler.`,
 
-📍墨尔本CBD自取优先
-💬 价格可小刀
+  Facebook: `You are a friendly and trustworthy Australian local selling an item on Facebook Marketplace. 
+Write entirely in English.
 
-#二手好物 #索尼耳机 #墨尔本二手 #断舍离`,
+[STYLE & TONE]
+- Detailed, conversational, and informative. DO NOT be overly brief or robotic.
+- Write a comprehensive description that anticipates buyer questions and builds trust.
+- Sound like a real person writing a thorough and thoughtful listing for an item they cared about.
 
-  Facebook: `You are writing a Facebook Marketplace listing
-for the Australian second-hand market.
-Write in English. Be direct and factual.
+[INPUT HANDLING & CONSTRAINTS]
+- You will receive product details (Brand, Model, Condition, Price, Notes).
+- DO NOT invent false specifications, but DO elaborate slightly on the general usefulness or features of the item in natural language to help the buyer understand its value.
 
-Example output format:
-Sony WH-1000XM5 Headphones – Like New – AUD $180
+[REQUIRED STRUCTURE]
+1. Title: [Brand] [Model] - [Condition]
+2. Price: [Price] (Ensure it's highly visible)
+3. The Story: A friendly paragraph explaining what the item is, how it was used, and the reason it's being sold. Expand on this to make it read naturally.
+4. Condition Details: A detailed breakdown of the condition. Explicitly mention how well it was maintained based on the input condition.
+5. Logistics: Thoroughly explain the pickup/delivery instructions based on the "Notes" input. Include standard friendly closers (e.g., "Feel free to message me if you have any questions. Cash or PayID on pickup.").
 
-Condition: Like new, used less than 10 times
-Includes: Original box, case, USB-C cable, adapter
+Output ONLY the listing content. No conversational filler.`,
 
-Selling because I switched to IEMs.
-No scratches, works perfectly.
+  eBay: `You are a Top-Rated eBay Seller in Australia specializing in writing professional, SEO-optimized, and dispute-proof product listings.
+Write entirely in English.
 
-Pick up only – Melbourne CBD
-Cash or bank transfer preferred
-Open to reasonable offers`,
+[STYLE & TONE]
+- Objective, professional, trustworthy, and highly structured.
+- Focus on buyer confidence and clarity to avoid post-sale disputes.
 
-  eBay: `You are writing a professional eBay listing
-for the Australian marketplace.
-Write in English. Be detailed and objective.
-Include condition specifics, what is included,
-and a brief return/buyer policy statement.
+[INPUT HANDLING & CONSTRAINTS]
+- You will receive product details (Brand, Model, Condition, Price, Notes).
+- STRICT RULE: You must describe the condition exactly as provided. Do not exaggerate or hide flaws. Do not hallucinate technical specifications unless they are universally true for that exact Brand/Model.
 
-Example output format:
-Sony WH-1000XM5 Wireless Noise-Cancelling
-Headphones | Like New | Full Accessories
+[REQUIRED STRUCTURE]
+1. SEO Title: Max 80 characters. [Brand] [Model] [Key Feature] [Condition]
+2. CONDITION SUMMARY: A clear, honest statement about the physical state.
+3. ITEM SPECIFICS: 
+   - Brand: [Brand]
+   - Model: [Model]
+   - Category: [Category]
+4. DETAILED DESCRIPTION: Paragraph form detailing the item, usage, and any notes provided by the user.
+5. SHIPPING & POLICIES: 
+   - [Incorporate any pickup/shipping info from "Notes"].
+   - Add standard disclaimer: "Buyer pays postage (if applicable). Please review all details and ask questions before purchasing. No returns accepted unless item is significantly not as described."
 
-CONDITION: Like new – used fewer than 10 times
-No scratches, dents, or faults.
-
-INCLUDES:
-- Original retail box
-- Premium carry case
-- USB-C charging cable
-- 3.5mm audio cable
-
-SPECIFICATIONS:
-- Battery: Up to 30 hours
-- Connectivity: Bluetooth 5.2
-
-Buyer pays postage. Returns accepted within
-14 days if item not as described.`,
+Output ONLY the listing content. No conversational filler.`,
 };
 
 interface GenerateRequestBody {
-  metadata: ProductMetadata;
+  prompt: string;
   platform: string;
-}
-
-function isValidPlatform(platform: string): platform is Platform {
-  return VALID_PLATFORMS.includes(platform as Platform);
 }
 
 export async function POST(request: Request): Promise<Response> {
   try {
     const body = (await request.json()) as GenerateRequestBody;
-    const { metadata, platform } = body;
 
-    if (!metadata) {
+    // useCompletion sends { prompt, ... } with extra body fields
+    const prompt = body.prompt;
+    const platform = body.platform as Platform;
+
+    console.log('Generate request:', { platform, promptLength: prompt?.length });
+
+    if (!prompt || !platform) {
       return Response.json(
-        { error: 'Missing metadata in request body' },
+        { error: 'Missing prompt or platform' },
         { status: 400 }
       );
     }
 
-    if (!platform || !isValidPlatform(platform)) {
-      return Response.json({ error: 'Invalid platform' }, { status: 400 });
+    if (!['Rednote', 'Facebook', 'eBay'].includes(platform)) {
+      return Response.json(
+        { error: 'Invalid platform' },
+        { status: 400 }
+      );
     }
 
-    const systemPrompt = systemPrompts[platform];
+    // prompt contains the metadata JSON string from complete(metadataString)
+    const fullPrompt = `Based on the following product metadata, write a listing for ${platform}:
+
+${prompt}
+
+Write the listing now.`;
 
     const result = streamText({
-      model: openai('gpt-4o'),
-      system: systemPrompt,
-      prompt: `Based on the following product metadata, write a listing for ${platform}:
-
-${JSON.stringify(metadata, null, 2)}
-
-Write the listing now.`,
+      model: google('gemini-2.5-flash'),
+      system: systemPrompts[platform],
+      prompt: fullPrompt,
     });
 
     return result.toTextStreamResponse();
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error occurred';
-    return Response.json({ error: errorMessage }, { status: 500 });
+    console.error('Generate API error:', error);
+    return Response.json(
+      { error: 'Generation failed' },
+      { status: 500 }
+    );
   }
 }
