@@ -96,7 +96,7 @@ export function UploadZone({ onImageProcessed, isExtracting }: UploadZoneProps) 
         onDrop={handleDrop}
         className={`
           relative flex min-h-[240px] cursor-pointer flex-col items-center
-          justify-center bg-[#E8E7E3] transition-all border border-[#C8C7C1]
+          justify-center bg-[#E8E7E3] transition-all border border-[#D0CFC9]
           ${isDragOver ? 'border-2 border-[#E8421A] bg-[#E8421A]/5' : ''}
           ${isDisabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-[#E5E5E5] hover:border-[#E8421A]'}
         `}

@@ -117,23 +117,23 @@ export default function Home() {
   }
 
   return (
-    <div className="bg-grid relative min-h-screen overflow-hidden pb-16">
+    <div className="bg-grid relative min-h-screen w-full overflow-x-hidden pb-16">
       {/* Header */}
-      <header className="border-b border-[#D0CFC9] px-8 py-5">
+      <header className="border-b border-[#D0CFC9] px-4 py-4 md:px-8 md:py-5">
         <div className="flex items-end justify-between">
           <div className="flex items-baseline gap-4">
-            <h1 className="text-4xl font-black uppercase tracking-tight">SNAP.</h1>
-            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-500">
+            <h1 className="text-3xl font-black uppercase tracking-tight md:text-4xl">SNAP.</h1>
+            <span className="hidden font-mono text-[9px] uppercase tracking-[0.2em] text-gray-500 md:block">
               AI Listing Generator
             </span>
           </div>
-          <span className="text-[9px] uppercase tracking-widest text-gray-300">©2025</span>
+          <span className="hidden text-[9px] uppercase tracking-widest text-gray-300 md:inline">©2025</span>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="p-8 lg:p-12">
-        <div className="grid gap-12 lg:grid-cols-[45%_55%] lg:gap-16">
+      <main className="px-4 py-6 md:p-8 lg:p-12">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-16 lg:grid-cols-[45%_55%]">
           {/* Left column - Input Area */}
           <div className="space-y-10">
             {/* Section header */}
@@ -149,7 +149,7 @@ export default function Home() {
             {/* Upload Zone */}
             <div>
               <div className="mb-3 flex items-center gap-3">
-                <span className="text-2xl font-black text-gray-400">01</span>
+                <span className="text-sm font-black text-gray-400 md:text-base">01</span>
                 <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-600">
                   Image Upload
                 </span>
@@ -172,7 +172,7 @@ export default function Home() {
             {/* Metadata Form */}
             <div className="border-t border-[#D0CFC9] pt-10">
               <div className="mb-6 flex items-center gap-3">
-                <span className="text-2xl font-black text-gray-400">02</span>
+                <span className="text-sm font-black text-gray-400 md:text-base">02</span>
                 <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-600">
                   Item Details
                 </span>
