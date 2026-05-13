@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCompletion } from '@ai-sdk/react';
 import type { Platform, ProductMetadata } from '@/lib/types';
 
@@ -17,6 +17,23 @@ const platformNumbers: Record<Platform, string> = {
   eBay: '03',
 };
 
+// Stagger requests slightly so 3 concurrent calls don't all hit Gemini in the same tick
+// (the most common cause of one-platform-succeeds, others-get-429).
+const PLATFORM_STAGGER_MS: Record<Platform, number> = {
+  Rednote: 0,
+  Facebook: 250,
+  eBay: 500,
+};
+
+function isAbortError(err: unknown): boolean {
+  if (!err) return false;
+  if (err instanceof Error) {
+    if (err.name === 'AbortError') return true;
+    if (/abort/i.test(err.message)) return true;
+  }
+  return false;
+}
+
 export function ListingEditor({
   platform,
   metadata,
@@ -25,13 +42,20 @@ export function ListingEditor({
 }: ListingEditorProps) {
   const [copied, setCopied] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  // Track the currently-active triggerId so stale callbacks (e.g. onError from a stop())
+  // can't downgrade status set by a newer request.
+  const activeTriggerRef = useRef(0);
 
   const { completion, complete, stop, isLoading, error, setCompletion } = useCompletion({
     api: '/api/generate',
     body: { platform },
     streamProtocol: 'text',
-    onFinish: () => onStatusChange(platform, 'success'),
+    onFinish: () => {
+      onStatusChange(platform, 'success');
+    },
     onError: (err) => {
+      // stop() raises an abort error — that's an intentional cancel, not a failure.
+      if (isAbortError(err)) return;
       console.error(platform + ': error', err);
       onStatusChange(platform, 'error');
     },
@@ -39,24 +63,37 @@ export function ListingEditor({
 
   useEffect(() => {
     if (triggerId <= 0 || !metadata) return;
-    console.log(`${platform}: triggering generation`, { triggerId, metadata });
+    if (triggerId === activeTriggerRef.current) return; // dedupe StrictMode double-fires
+    activeTriggerRef.current = triggerId;
 
-    // Track if this is a regeneration (already has content)
+    console.log(`${platform}: triggering generation`, { triggerId });
+
+    // Reset content + cancel any in-flight request from a previous trigger
     if (completion) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsRegenerating(true);
-      setCompletion(''); // Clear previous content
+      setCompletion('');
     }
-
     stop();
     onStatusChange(platform, 'loading');
-    complete(JSON.stringify(metadata)).then(() => {
-      console.log(`${platform}: complete() resolved`);
-      setIsRegenerating(false);
-    }).catch((err) => {
-      console.error(`${platform}: complete() failed`, err);
-      setIsRegenerating(false);
-    });
+
+    const myTrigger = triggerId;
+    const timer = setTimeout(() => {
+      if (activeTriggerRef.current !== myTrigger) return;
+      complete(JSON.stringify(metadata))
+        .catch((err) => {
+          if (activeTriggerRef.current !== myTrigger) return;
+          if (isAbortError(err)) return;
+          console.error(`${platform}: complete() failed`, err);
+          onStatusChange(platform, 'error');
+        })
+        .finally(() => {
+          if (activeTriggerRef.current !== myTrigger) return;
+          setIsRegenerating(false);
+        });
+    }, PLATFORM_STAGGER_MS[platform]);
+
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerId]);
 
@@ -116,20 +153,26 @@ export function ListingEditor({
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center py-24">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#E8421A] mb-4">
-              {error.message.toLowerCase().includes('429') ||
-             error.message.toLowerCase().includes('quota') ||
-             error.message.toLowerCase().includes('rate')
-              ? 'Rate limit reached. Please wait and try again.'
-              : 'Generation failed. Please try again.'}
+              {(() => {
+                const msg = error.message.toLowerCase();
+                if (msg.includes('429') || msg.includes('quota') || msg.includes('rate')) {
+                  return 'Rate limit reached. Please wait and try again.';
+                }
+                if (msg.includes('503') || msg.includes('unavailable')) {
+                  return 'Service temporarily unavailable. Please retry.';
+                }
+                return 'Generation failed. Please try again.';
+              })()}
             </p>
             <button
               onClick={() => {
-                if (metadata) {
-                  onStatusChange(platform, 'loading');
-                  complete(JSON.stringify(metadata)).catch(() => {
-                    onStatusChange(platform, 'error');
-                  });
-                }
+                if (!metadata) return;
+                onStatusChange(platform, 'loading');
+                setCompletion('');
+                complete(JSON.stringify(metadata)).catch((err) => {
+                  if (isAbortError(err)) return;
+                  onStatusChange(platform, 'error');
+                });
               }}
               disabled={!metadata}
               className="border border-[#E8421A] px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-[#E8421A] hover:bg-[#E8421A] hover:text-white transition-colors"

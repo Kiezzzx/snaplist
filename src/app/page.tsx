@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { UploadZone } from '@/components/upload-zone';
 import { MetadataForm } from '@/components/metadata-form';
 import { ListingEditor } from '@/components/listing-editor';
@@ -26,12 +26,17 @@ export default function Home() {
   ]);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [platformStatuses, setPlatformStatuses] = useState<Record<Platform, string>>({
     Rednote: 'idle',
     Facebook: 'idle',
     eBay: 'idle',
   });
+  // Keep selectedPlatforms in a ref so handleStatusChange (called from child callbacks)
+  // never reads a stale snapshot when checking "are all selected platforms done?"
+  const selectedPlatformsRef = useRef<Platform[]>(selectedPlatforms);
+  useEffect(() => {
+    selectedPlatformsRef.current = selectedPlatforms;
+  }, [selectedPlatforms]);
 
   async function onImageProcessed(base64: string) {
     setIsExtracting(true);
@@ -91,9 +96,10 @@ export default function Home() {
     setActiveTab(platforms[0]);
     setHasGenerated(true);
     setIsGenerating(true);
-    // Reset statuses to loading for selected platforms
-    setPlatformStatuses((prev) => {
-      const next = { ...prev };
+    // Selected platforms -> loading; unselected -> idle so all-done check
+    // can't be blocked by a stale 'loading' from a previous generation.
+    setPlatformStatuses(() => {
+      const next: Record<Platform, string> = { Rednote: 'idle', Facebook: 'idle', eBay: 'idle' };
       for (const p of platforms) {
         next[p] = 'loading';
       }
@@ -105,8 +111,9 @@ export default function Home() {
     console.log(`${platform}: ${status}`);
     setPlatformStatuses((prev) => {
       const next = { ...prev, [platform]: status };
-      // Check if all selected platforms are done
-      const allDone = selectedPlatforms.every(
+      // Read selectedPlatforms via ref to avoid stale-closure mistakes
+      // when this callback is invoked from a child during a render cycle.
+      const allDone = selectedPlatformsRef.current.every(
         (p) => next[p] === 'success' || next[p] === 'error'
       );
       if (allDone) {
@@ -202,6 +209,7 @@ export default function Home() {
             <div className="flex items-end gap-6 border-b border-[#D0CFC9]">
               {selectedPlatforms.map((platform) => {
                 const isActive = activeTab === platform;
+                const status = platformStatuses[platform];
                 return (
                   <button
                     key={platform}
@@ -217,9 +225,27 @@ export default function Home() {
                   >
                     <span className="mr-2 font-bold">{platformNumbers[platform]}</span>
                     {platform}
-                    {isActive && (
+                    {/* Per-tab status so users see ALL platform results, not just the active one. */}
+                    {status === 'loading' ? (
+                      <span
+                        className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 ml-1.5 align-middle animate-pulse"
+                        title="Generating…"
+                      />
+                    ) : status === 'error' ? (
+                      <span
+                        className="ml-1.5 align-middle font-bold text-[#E8421A]"
+                        title="Generation failed"
+                      >
+                        !
+                      </span>
+                    ) : status === 'success' ? (
+                      <span
+                        className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1.5 align-middle"
+                        title="Generated"
+                      />
+                    ) : isActive ? (
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#E8421A] ml-1.5 align-middle" />
-                    )}
+                    ) : null}
                   </button>
                 );
               })}

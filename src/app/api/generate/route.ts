@@ -124,17 +124,32 @@ Write the listing now.`;
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
+        let streamedAny = false;
         try {
           if (!first.done) {
             controller.enqueue(encoder.encode(first.value));
+            streamedAny = true;
           }
           for (;;) {
             const chunk = await iter.next();
             if (chunk.done) break;
             controller.enqueue(encoder.encode(chunk.value));
+            streamedAny = true;
           }
-        } catch {
-          // mid-stream error — response already started, just close
+        } catch (err) {
+          // Mid-stream failure: HTTP 200 is already committed, so we can't switch
+          // to an error status code. Surface the failure to the client as a visible
+          // sentinel rather than silently truncating — otherwise the UI would render
+          // partial output and label it "Generation complete".
+          console.error('Generate stream mid-stream error:', err);
+          const marker = streamedAny
+            ? '\n\n[ERROR: stream interrupted — please regenerate]'
+            : '[ERROR: generation failed — please regenerate]';
+          try {
+            controller.enqueue(encoder.encode(marker));
+          } catch {
+            // controller already closed; nothing we can do
+          }
         } finally {
           controller.close();
         }
@@ -151,6 +166,12 @@ Write the listing now.`;
       return Response.json(
         { error: 'Rate limit exceeded. Please wait and try again.' },
         { status: 429 }
+      );
+    }
+    if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('overloaded')) {
+      return Response.json(
+        { error: 'Model temporarily unavailable. Please retry.' },
+        { status: 503 }
       );
     }
     return Response.json(
