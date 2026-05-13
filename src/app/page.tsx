@@ -206,7 +206,7 @@ export default function Home() {
             </div>
 
             {/* Platform tabs */}
-            <div className="flex items-end gap-6 border-b border-[#D0CFC9]">
+            <div className="flex items-end gap-6 border-b border-[#D0CFC9] overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
               {selectedPlatforms.map((platform) => {
                 const isActive = activeTab === platform;
                 const status = platformStatuses[platform];
@@ -215,7 +215,7 @@ export default function Home() {
                     key={platform}
                     onClick={() => setActiveTab(platform)}
                     className={`
-                      px-4 py-3 text-xs uppercase tracking-widest transition-colors
+                      whitespace-nowrap px-4 py-3 text-xs uppercase tracking-widest transition-colors
                       ${
                         isActive
                           ? 'border-b-2 border-black text-black font-semibold'
