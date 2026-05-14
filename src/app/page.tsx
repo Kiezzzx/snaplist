@@ -206,7 +206,7 @@ export default function Home() {
             </div>
 
             {/* Platform tabs */}
-            <div className="flex items-end gap-6 border-b border-[#D0CFC9] overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="flex items-end gap-2 md:gap-6 border-b border-[#D0CFC9] overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
               {selectedPlatforms.map((platform) => {
                 const isActive = activeTab === platform;
                 const status = platformStatuses[platform];
@@ -215,7 +215,7 @@ export default function Home() {
                     key={platform}
                     onClick={() => setActiveTab(platform)}
                     className={`
-                      whitespace-nowrap px-4 py-3 text-xs uppercase tracking-widest transition-colors
+                      shrink-0 whitespace-nowrap px-2 py-3 text-[10px] tracking-wider md:px-4 md:text-xs md:tracking-widest uppercase transition-colors
                       ${
                         isActive
                           ? 'border-b-2 border-black text-black font-semibold'
@@ -223,7 +223,7 @@ export default function Home() {
                       }
                     `}
                   >
-                    <span className="mr-2 font-bold">{platformNumbers[platform]}</span>
+                    <span className="mr-1 md:mr-2 font-bold">{platformNumbers[platform]}</span>
                     {platform}
                     {/* Per-tab status so users see ALL platform results, not just the active one. */}
                     {status === 'loading' ? (
