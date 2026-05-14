@@ -7,10 +7,19 @@ import type { ProductMetadata } from '@/lib/types';
 const MAX_PAYLOAD_BYTES = 4.5 * 1024 * 1024;
 
 const productMetadataSchema = z.object({
-  category: z.string(),
+  category: z.enum([
+    'Electronics',
+    'Furniture',
+    'Clothing',
+    'Books',
+    'Sports',
+    'Kitchen',
+    'Toys',
+    'Other',
+  ]),
   brand: z.string(),
   model: z.string(),
-  condition: z.string(),
+  condition: z.enum(['Brand New', 'Like New', 'Good', 'Fair', 'Poor']),
   suggestedPrice: z.string().transform((val) => {
     // Strip any non-numeric characters except decimal
     const cleaned = val.replace(/[^0-9.]/g, '');
@@ -18,15 +27,36 @@ const productMetadataSchema = z.object({
   }),
 });
 
-const systemPrompt = `You are an expert second-hand goods appraiser.
+const systemPrompt = `Context: Australian second-hand market (AUD pricing).
+
+You are an expert second-hand goods appraiser.
 Analyze the image and extract product details.
 
-For suggestedPrice: Research typical second-hand market value in Australia (AUD).
-Return ONLY a number like '150' or '299'.
-No currency symbols, no ranges like '100-200', just a single number.
-If truly unknown, return empty string.
+Condition grading rubric:
+- Brand New: sealed in original packaging, never used
+- Like New: used once or twice, no visible marks
+- Good: normal use, minor scratches only
+- Fair: visible wear, scratches or small marks
+- Poor: heavy wear, damage, or missing parts
 
-Return empty string for any field you are unsure about.
+For category: must be one of Electronics, Furniture, Clothing, Books, Sports, Kitchen, Toys, Other. If an item fits multiple categories, choose the most specific one. Example: Nike shoes → Clothing (not Sports). Use 'Other' only when no listed category fits.
+
+For condition: must be one of Brand New, Like New, Good, Fair, Poor. Pick the best estimate based on the visible condition in the photo using the rubric above.
+
+For model: return the specific SKU or model number if visible (e.g. 'WH-1000XM5', 'iPhone 14 Pro'). If only a generic description is possible, return that instead.
+
+For suggestedPrice: Estimate the typical second-hand resale value in Australia (AUD) based on your knowledge of similar items. Only estimate if brand AND model are confidently identified. Format as a bare integer string only, e.g. '150'. If truly unknown, return empty string.
+
+Example output:
+{
+  category: 'Electronics',
+  brand: 'Sony',
+  model: 'WH-1000XM5',
+  condition: 'Good',
+  suggestedPrice: '180'
+}
+
+Return empty string for brand, model, or suggestedPrice if you are unsure.
 Never guess brand or model if not clearly visible.`;
 
 interface ExtractRequestBody {
