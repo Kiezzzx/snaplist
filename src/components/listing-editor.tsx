@@ -202,16 +202,6 @@ export function ListingEditor({
             <p className="text-xs text-gray-300 leading-relaxed max-w-[200px]">
               Upload a photo and fill in item details, then click Generate
             </p>
-            <div className="mt-8 flex gap-2">
-              {['REDNOTE', 'FACEBOOK', 'EBAY'].map((p) => (
-                <span
-                  key={p}
-                  className="text-[9px] tracking-widest text-gray-200 uppercase border border-[#E8E7E3] px-2 py-1"
-                >
-                  {p}
-                </span>
-              ))}
-            </div>
             <div className="w-16 h-px bg-[#D0CFC9] mt-8" />
           </div>
         )}
