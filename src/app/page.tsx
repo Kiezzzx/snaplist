@@ -140,9 +140,9 @@ export default function Home() {
 
       {/* Main content */}
       <main className="px-4 py-6 md:p-8 lg:p-12">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-16 lg:grid-cols-[45%_55%]">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-16 lg:grid-cols-[45fr_55fr]">
           {/* Left column - Input Area */}
-          <div className="space-y-10">
+          <div className="min-w-0 space-y-10">
             {/* Section header */}
             <div className="flex items-center justify-between border-b border-[#D0CFC9] pb-2">
               <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-gray-600">
@@ -194,7 +194,7 @@ export default function Home() {
           </div>
 
           {/* Right column - Output Area */}
-          <div className="min-h-screen space-y-6">
+          <div className="min-w-0 space-y-6">
             {/* Section header */}
             <div className="flex items-center justify-between border-b border-[#D0CFC9] pb-2">
               <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-gray-600">

@@ -42,6 +42,11 @@ export function ListingEditor({
 }: ListingEditorProps) {
   const [copied, setCopied] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  // null = user hasn't edited yet (display falls back to completion);
+  // string = user's edited buffer.
+  const [userEdits, setUserEdits] = useState<string | null>(null);
+  // Auto-grow textarea so all content is visible without an internal scrollbar.
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Track the currently-active triggerId so stale callbacks (e.g. onError from a stop())
   // can't downgrade status set by a newer request.
   const activeTriggerRef = useRef(0);
@@ -61,6 +66,14 @@ export function ListingEditor({
     },
   });
 
+  // Auto-grow the textarea on every content change (streaming end + user typing).
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [userEdits, completion, isLoading]);
+
   useEffect(() => {
     if (triggerId <= 0 || !metadata) return;
     if (triggerId === activeTriggerRef.current) return; // dedupe StrictMode double-fires
@@ -74,6 +87,7 @@ export function ListingEditor({
       setIsRegenerating(true);
       setCompletion('');
     }
+    setUserEdits(null);
     stop();
     onStatusChange(platform, 'loading');
 
@@ -98,13 +112,14 @@ export function ListingEditor({
   }, [triggerId]);
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(completion);
+    const textToCopy = userEdits ?? completion;
+    await navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   return (
-    <div className="relative min-h-[600px] border-t border-[#D0CFC9] pt-6">
+    <div className="relative border-t border-[#D0CFC9] pt-6">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
@@ -137,7 +152,7 @@ export function ListingEditor({
       </div>
 
       {/* Content area */}
-      <div className="relative min-h-[500px]">
+      <div className="relative">
         {isLoading && !completion ? (
           <div className="flex h-full flex-col items-center justify-center py-24">
             {/* Loading animation */}
@@ -182,14 +197,29 @@ export function ListingEditor({
           </div>
         ) : completion ? (
           <div className="relative">
-            <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-black">
-              {completion}
-            </p>
+            {isLoading ? (
+              <p className="whitespace-pre-wrap wrap-break-word font-mono text-sm leading-relaxed text-black">
+                {completion}
+              </p>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                value={userEdits ?? completion}
+                onChange={(e) => {
+                  setUserEdits(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${e.target.scrollHeight}px`;
+                }}
+                className="w-full resize-none overflow-hidden border-b-0 bg-transparent p-0 whitespace-pre-wrap font-mono text-sm leading-relaxed text-black focus:outline-none hover:bg-[#FAFAFA]/40 focus:bg-[#FAFAFA]/60 transition-colors"
+                style={{ height: 'auto' }}
+              />
+            )}
             {/* Status indicator */}
             <div className="mt-6 flex items-center gap-2 border-t border-[#D0CFC9] pt-4">
               <div className="h-2 w-2 bg-green-500" />
               <span className="font-mono text-[8px] uppercase tracking-[0.2em] text-gray-400">
-                Generation complete — {completion.length} characters
+                Generation complete — {(userEdits ?? completion).length} characters
+                {userEdits !== null && ' · edited'}
               </span>
             </div>
           </div>
