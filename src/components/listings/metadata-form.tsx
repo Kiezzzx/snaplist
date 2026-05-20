@@ -152,6 +152,7 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
             value={form.brand}
             onChange={(e) => handleChange('brand', e.target.value)}
             placeholder="e.g. Sony, Apple, IKEA"
+            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-sm placeholder:text-gray-300 focus:border-[#E8421A] focus:outline-none"
           />
         </div>
 
@@ -166,6 +167,7 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
             value={form.model}
             onChange={(e) => handleChange('model', e.target.value)}
             placeholder="e.g. WH-1000XM5, iPhone 14"
+            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-sm placeholder:text-gray-300 focus:border-[#E8421A] focus:outline-none"
           />
         </div>
 
@@ -197,12 +199,13 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
           <input
             id="price"
             type="number"
+            inputMode="decimal"
             value={form.price}
             onChange={(e) => handleChange('price', e.target.value)}
             onFocus={() => setShowSuggested(true)}
             placeholder="Enter your asking price"
             min="0"
-            className="text-base font-medium"
+            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-base font-medium placeholder:font-normal placeholder:text-gray-300 focus:border-[#E8421A] focus:outline-none"
           />
           {aiData?.suggestedPrice && showSuggested && (
             <div className="mt-2 flex items-center gap-2">
@@ -300,9 +303,9 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
           {isGenerating ? (
             <span className="flex items-center justify-center gap-3">
               <span className="flex gap-1">
-                <span className="h-2 w-2 animate-pulse bg-white" />
-                <span className="h-2 w-2 animate-pulse bg-white" style={{ animationDelay: '150ms' }} />
-                <span className="h-2 w-2 animate-pulse bg-white" style={{ animationDelay: '300ms' }} />
+                <span className="h-2 w-2 bg-white motion-safe:animate-pulse" />
+                <span className="h-2 w-2 bg-white motion-safe:animate-pulse" style={{ animationDelay: '150ms' }} />
+                <span className="h-2 w-2 bg-white motion-safe:animate-pulse" style={{ animationDelay: '300ms' }} />
               </span>
               GENERATING...
             </span>

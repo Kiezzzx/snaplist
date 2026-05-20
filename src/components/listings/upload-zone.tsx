@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { Camera } from 'lucide-react';
-import { compressAndConvertToBase64 } from '@/lib/compress-image';
+import { compressAndConvertToBase64 } from '@/lib/utils/compress-image';
 
 interface UploadZoneProps {
   onImageProcessed: (base64: string) => void;
@@ -144,9 +144,9 @@ export function UploadZone({ onImageProcessed, isExtracting }: UploadZoneProps) 
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
                 {/* Animated loading indicator */}
                 <div className="mb-4 flex gap-1">
-                  <div className="h-2 w-2 animate-pulse bg-[#E8421A]" style={{ animationDelay: '0ms' }} />
-                  <div className="h-2 w-2 animate-pulse bg-[#E8421A]" style={{ animationDelay: '150ms' }} />
-                  <div className="h-2 w-2 animate-pulse bg-[#E8421A]" style={{ animationDelay: '300ms' }} />
+                  <div className="h-2 w-2 bg-[#E8421A] motion-safe:animate-pulse" style={{ animationDelay: '0ms' }} />
+                  <div className="h-2 w-2 bg-[#E8421A] motion-safe:animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <div className="h-2 w-2 bg-[#E8421A] motion-safe:animate-pulse" style={{ animationDelay: '300ms' }} />
                 </div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-white">
                   {isCompressing ? 'COMPRESSING...' : 'EXTRACTING DATA...'}

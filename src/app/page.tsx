@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { UploadZone } from '@/components/upload-zone';
-import { MetadataForm } from '@/components/metadata-form';
-import { ListingEditor } from '@/components/listing-editor';
+import Link from 'next/link';
+import { Check } from 'lucide-react';
+import { UploadZone } from '@/components/listings/upload-zone';
+import { MetadataForm } from '@/components/listings/metadata-form';
+import { ListingEditor } from '@/components/listings/listing-editor';
 import type { ProductMetadata, Platform } from '@/lib/types';
 
 const platformNumbers: Record<Platform, string> = {
@@ -14,6 +16,7 @@ const platformNumbers: Record<Platform, string> = {
 
 export default function Home() {
   const [aiData, setAiData] = useState<Partial<ProductMetadata> | null>(null);
+  const [dbId, setDbId] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [targetMetadata, setTargetMetadata] = useState<ProductMetadata | null>(null);
@@ -71,9 +74,10 @@ export default function Home() {
         return;
       }
 
-      const json = (await res.json()) as { success: boolean; data?: Partial<ProductMetadata>; error?: string };
+      const json = (await res.json()) as { success: boolean; dbId?: string; metadata?: Partial<ProductMetadata>; error?: string };
       if (json.success) {
-        setAiData(json.data ?? null);
+        setAiData(json.metadata ?? null);
+        setDbId(json.dbId ?? null);
       } else {
         setExtractError(json.error ?? 'Extraction failed');
       }
@@ -134,7 +138,12 @@ export default function Home() {
               AI Listing Generator
             </span>
           </div>
-          <span className="hidden text-[9px] uppercase tracking-widest text-gray-300 md:inline">©2025</span>
+          <Link
+            href="/dashboard"
+            className="-mr-2 inline-flex min-h-11 items-center px-2 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500 transition-colors hover:text-[#E8421A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8421A]"
+          >
+            View History →
+          </Link>
         </div>
       </header>
 
@@ -225,26 +234,34 @@ export default function Home() {
                   >
                     <span className="mr-1 md:mr-2 font-bold">{platformNumbers[platform]}</span>
                     {platform}
-                    {/* Per-tab status so users see ALL platform results, not just the active one. */}
+                    {/* Per-tab status so users see ALL platform results, not just the active one.
+                        Shape AND color differentiate the four states so color-blind users
+                        and screen readers can distinguish them. */}
                     {status === 'loading' ? (
                       <span
-                        className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 ml-1.5 align-middle animate-pulse"
-                        title="Generating…"
+                        className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-gray-400 align-middle motion-safe:animate-pulse"
+                        role="status"
+                        aria-label={`${platform}: generating`}
                       />
                     ) : status === 'error' ? (
                       <span
                         className="ml-1.5 align-middle font-bold text-[#E8421A]"
-                        title="Generation failed"
+                        role="status"
+                        aria-label={`${platform}: generation failed`}
                       >
                         !
                       </span>
                     ) : status === 'success' ? (
-                      <span
-                        className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 ml-1.5 align-middle"
-                        title="Generated"
+                      <Check
+                        className="ml-1.5 inline-block h-3 w-3 align-middle text-green-600"
+                        role="status"
+                        aria-label={`${platform}: generated`}
                       />
                     ) : isActive ? (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#E8421A] ml-1.5 align-middle" />
+                      <span
+                        className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#E8421A] align-middle"
+                        aria-hidden
+                      />
                     ) : null}
                   </button>
                 );
@@ -256,7 +273,9 @@ export default function Home() {
               <ListingEditor
                 platform="Rednote"
                 metadata={targetMetadata}
+                dbId={dbId}
                 triggerId={selectedPlatforms.includes('Rednote') ? generateTriggerId : 0}
+                isActive={activeTab === 'Rednote'}
                 onStatusChange={handleStatusChange}
               />
             </div>
@@ -264,7 +283,9 @@ export default function Home() {
               <ListingEditor
                 platform="Facebook"
                 metadata={targetMetadata}
+                dbId={dbId}
                 triggerId={selectedPlatforms.includes('Facebook') ? generateTriggerId : 0}
+                isActive={activeTab === 'Facebook'}
                 onStatusChange={handleStatusChange}
               />
             </div>
@@ -272,7 +293,9 @@ export default function Home() {
               <ListingEditor
                 platform="eBay"
                 metadata={targetMetadata}
+                dbId={dbId}
                 triggerId={selectedPlatforms.includes('eBay') ? generateTriggerId : 0}
+                isActive={activeTab === 'eBay'}
                 onStatusChange={handleStatusChange}
               />
             </div>

@@ -49,6 +49,7 @@ export interface PlatformListing {
  */
 export interface ExtractResponse {
   success: boolean;
-  data?: Partial<ProductMetadata>;
+  dbId?: string;
+  metadata?: Partial<ProductMetadata>;
   error?: string;
 }

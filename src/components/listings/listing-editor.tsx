@@ -7,7 +7,11 @@ import type { Platform, ProductMetadata } from '@/lib/types';
 interface ListingEditorProps {
   platform: Platform;
   metadata: ProductMetadata | null;
+  dbId: string | null;
   triggerId: number;
+  // True when this editor's tab is visible. Hidden tabs (display:none) report
+  // scrollHeight=0, so height measurement must re-run when the tab is shown.
+  isActive: boolean;
   onStatusChange: (platform: Platform, status: string) => void;
 }
 
@@ -37,7 +41,9 @@ function isAbortError(err: unknown): boolean {
 export function ListingEditor({
   platform,
   metadata,
+  dbId,
   triggerId,
+  isActive,
   onStatusChange,
 }: ListingEditorProps) {
   const [copied, setCopied] = useState(false);
@@ -46,6 +52,10 @@ export function ListingEditor({
   // string = user's edited buffer.
   const [userEdits, setUserEdits] = useState<string | null>(null);
   // Auto-grow textarea so all content is visible without an internal scrollbar.
+  // Height lives in React state — using an inline style prop alongside imperative
+  // DOM mutation causes any unrelated parent re-render to reset height to 'auto'
+  // (React re-applies the JSX style on every render, overriding our DOM mutation).
+  const [textHeight, setTextHeight] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Track the currently-active triggerId so stale callbacks (e.g. onError from a stop())
   // can't downgrade status set by a newer request.
@@ -53,7 +63,7 @@ export function ListingEditor({
 
   const { completion, complete, stop, isLoading, error, setCompletion } = useCompletion({
     api: '/api/generate',
-    body: { platform },
+    body: { platform, dbId },
     streamProtocol: 'text',
     onFinish: () => {
       onStatusChange(platform, 'success');
@@ -66,13 +76,18 @@ export function ListingEditor({
     },
   });
 
-  // Auto-grow the textarea on every content change (streaming end + user typing).
+  // Measure intrinsic content height when stream ends, content changes, or this
+  // editor's tab becomes visible. `isActive` is critical: hidden tabs sit inside
+  // display:none containers where scrollHeight is always 0, so a measurement
+  // taken while hidden would lock the textarea at zero height even after the
+  // tab is revealed. Re-running on isActive→true catches the visible case.
   useEffect(() => {
+    if (!isActive) return;
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [userEdits, completion, isLoading]);
+    setTextHeight(el.scrollHeight);
+  }, [userEdits, completion, isLoading, isActive]);
 
   useEffect(() => {
     if (triggerId <= 0 || !metadata) return;
@@ -157,9 +172,9 @@ export function ListingEditor({
           <div className="flex h-full flex-col items-center justify-center py-24">
             {/* Loading animation */}
             <div className="mb-6 flex gap-2">
-              <div className="h-2 w-2 animate-pulse bg-gray-400" style={{ animationDelay: '0ms' }} />
-              <div className="h-2 w-2 animate-pulse bg-gray-400" style={{ animationDelay: '150ms' }} />
-              <div className="h-2 w-2 animate-pulse bg-gray-400" style={{ animationDelay: '300ms' }} />
+              <div className="h-2 w-2 bg-gray-400 motion-safe:animate-pulse" style={{ animationDelay: '0ms' }} />
+              <div className="h-2 w-2 bg-gray-400 motion-safe:animate-pulse" style={{ animationDelay: '150ms' }} />
+              <div className="h-2 w-2 bg-gray-400 motion-safe:animate-pulse" style={{ animationDelay: '300ms' }} />
             </div>
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-gray-400">
               {isRegenerating ? 'Regenerating copy...' : 'Generating copy...'}
@@ -208,10 +223,10 @@ export function ListingEditor({
                 onChange={(e) => {
                   setUserEdits(e.target.value);
                   e.target.style.height = 'auto';
-                  e.target.style.height = `${e.target.scrollHeight}px`;
+                  setTextHeight(e.target.scrollHeight);
                 }}
                 className="w-full resize-none overflow-hidden border-b-0 bg-transparent p-0 whitespace-pre-wrap font-mono text-sm leading-relaxed text-black focus:outline-none hover:bg-[#FAFAFA]/40 focus:bg-[#FAFAFA]/60 transition-colors"
-                style={{ height: 'auto' }}
+                style={{ height: textHeight ? `${textHeight}px` : 'auto' }}
               />
             )}
             {/* Status indicator */}
@@ -224,12 +239,12 @@ export function ListingEditor({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-12">
+          <div className="flex flex-col items-center justify-center h-full min-h-100 text-center px-12">
             <div className="w-16 h-px bg-[#D0CFC9] mb-8" />
             <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-3">
               Awaiting Generation
             </p>
-            <p className="text-xs text-gray-300 leading-relaxed max-w-[200px]">
+            <p className="text-xs text-gray-300 leading-relaxed max-w-50">
               Upload a photo and fill in item details, then click Generate
             </p>
             <div className="w-16 h-px bg-[#D0CFC9] mt-8" />
