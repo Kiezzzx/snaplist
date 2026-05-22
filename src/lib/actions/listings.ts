@@ -31,6 +31,11 @@ export async function createListing(metadata: CreateListingInput): Promise<strin
     })
     .returning({ id: listings.id });
 
+  // Without this, /dashboard's Full Route Cache serves stale HTML and new
+  // uploads silently fail to appear in history. See deleteListing for the
+  // same invariant on the delete path.
+  revalidatePath('/dashboard');
+
   return row.id;
 }
 
@@ -54,6 +59,10 @@ export async function persistGeneratedCopy(
       updatedAt: new Date(),
     })
     .where(eq(listings.id, dbId));
+
+  // Refresh the dashboard so the status pill flips from 'draft' to 'generated'
+  // (and any copy preview appears) without requiring a hard reload.
+  revalidatePath('/dashboard');
 }
 
 export async function deleteListing(id: string): Promise<void> {
