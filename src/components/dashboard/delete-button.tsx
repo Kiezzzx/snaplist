@@ -1,12 +1,18 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useTransition, type MouseEvent } from 'react';
 import { deleteListing } from '@/lib/actions/listings';
 
 export function DashboardDeleteButton({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition();
 
-  function handleClick() {
+  function handleClick(e: MouseEvent<HTMLButtonElement>) {
+    // The button is nested inside the row's <Link>. Without preventDefault the
+    // ancestor <a> would navigate to the detail page on click; without
+    // stopPropagation the same click could fire a Link-level handler before
+    // ours. Both are needed to keep Delete from leaving the dashboard.
+    e.preventDefault();
+    e.stopPropagation();
     if (!window.confirm('Delete this listing? This cannot be undone.')) return;
     startTransition(async () => {
       await deleteListing(id);

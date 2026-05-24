@@ -37,6 +37,9 @@ export const listings = pgTable(
 
     originalImageKey: text('original_image_key'),
     thumbnailKey: text('thumbnail_key'),
+    // TEMP: replace with R2 in Phase 4. Stores a tiny 100x100 webp data URI so
+    // the dashboard + detail page have something to render before R2 lands.
+    thumbnailBase64: text('thumbnail_base64'),
     imageSize: integer('image_size'),
 
     // $type lifts the literal union to compile-time so a typo like 'uplaoded'

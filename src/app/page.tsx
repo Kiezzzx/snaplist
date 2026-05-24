@@ -6,6 +6,7 @@ import { Check } from 'lucide-react';
 import { UploadZone } from '@/components/listings/upload-zone';
 import { MetadataForm } from '@/components/listings/metadata-form';
 import { ListingEditor } from '@/components/listings/listing-editor';
+import { markListingAsGenerated } from '@/lib/actions/listings';
 import type { ProductMetadata, Platform } from '@/lib/types';
 
 const platformNumbers: Record<Platform, string> = {
@@ -40,6 +41,19 @@ export default function Home() {
   useEffect(() => {
     selectedPlatformsRef.current = selectedPlatforms;
   }, [selectedPlatforms]);
+  // Same staleness guard for dbId — handleStatusChange fires from child callbacks
+  // and needs the latest id at the moment all platforms finish.
+  const dbIdRef = useRef<string | null>(dbId);
+  useEffect(() => {
+    dbIdRef.current = dbId;
+  }, [dbId]);
+  // Fire markListingAsGenerated at most once per generation run; otherwise each
+  // straggler 'success' callback would re-trigger the DB write.
+  const markedTriggerRef = useRef<number>(0);
+  const generateTriggerIdRef = useRef<number>(0);
+  useEffect(() => {
+    generateTriggerIdRef.current = generateTriggerId;
+  }, [generateTriggerId]);
 
   async function onImageProcessed(base64: string) {
     setIsExtracting(true);
@@ -97,6 +111,8 @@ export default function Home() {
     setTargetMetadata(metadata);
     setSelectedPlatforms(platforms);
     setGenerateTriggerId(Date.now());
+    // Reset the mark-once guard so the new run can fire markListingAsGenerated.
+    markedTriggerRef.current = 0;
     setActiveTab(platforms[0]);
     setHasGenerated(true);
     setIsGenerating(true);
@@ -122,6 +138,23 @@ export default function Home() {
       );
       if (allDone) {
         setIsGenerating(false);
+        const allSuccess = selectedPlatformsRef.current.every(
+          (p) => next[p] === 'success'
+        );
+        const id = dbIdRef.current;
+        const trigger = generateTriggerIdRef.current;
+        // Only mark the row 'generated' when EVERY selected platform succeeded —
+        // a partial run (any 'error') stays in 'draft' so the user can retry.
+        // The markedTriggerRef guard prevents duplicate writes if multiple
+        // success callbacks somehow flush during the same trigger window.
+        if (allSuccess && id && trigger > 0 && markedTriggerRef.current !== trigger) {
+          markedTriggerRef.current = trigger;
+          markListingAsGenerated(id).catch((err) => {
+            console.error('Failed to mark listing as generated:', err);
+            // Reset so a retry can re-attempt the transition.
+            markedTriggerRef.current = 0;
+          });
+        }
       }
       return next;
     });

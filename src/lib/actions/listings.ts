@@ -1,10 +1,11 @@
 'use server';
 
 import { z } from 'zod';
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { listings } from '@/lib/db/schema';
+import { getAnonSessionId } from '@/lib/session';
 import type { Platform } from '@/lib/types';
 
 // Mirrors ListingMetadata $type for runtime parse — CLAUDE.md hard constraint #3
@@ -20,14 +21,39 @@ const metadataSchema = z.object({
 
 export type CreateListingInput = z.infer<typeof metadataSchema>;
 
-export async function createListing(metadata: CreateListingInput): Promise<string> {
+// TEMP: replace with R2 in Phase 4. Optional thumbnail bag — kept as a
+// second positional arg so the R2 cutover only deletes this param + the
+// column write, leaving the metadata signature untouched.
+export interface CreateListingOptions {
+  thumbnailBase64?: string;
+}
+
+export async function createListing(
+  metadata: CreateListingInput,
+  options: CreateListingOptions = {},
+): Promise<string> {
   const parsed = metadataSchema.parse(metadata);
+
+  // Owner key for the row. Middleware issues this cookie on the upload request,
+  // so a missing value here means the request bypassed middleware — fail loudly
+  // rather than orphan a row no dashboard query can ever scope to.
+  const anonymousSessionId = await getAnonSessionId();
+  if (!anonymousSessionId) {
+    throw new Error('Cannot create listing: no anonymous session');
+  }
 
   const [row] = await db
     .insert(listings)
     .values({
-      anonymousSessionId: 'test-session',
+      anonymousSessionId,
       metadata: parsed,
+      // TEMP: replace with R2 in Phase 4. Once R2 is wired, drop this and
+      // populate thumbnailKey from the upload result instead.
+      thumbnailBase64: options.thumbnailBase64,
+      // Extract succeeded by the time we reach createListing, so the image
+      // is no longer 'pending'. Stale-pending detection on the dashboard
+      // would otherwise mark every fresh row as "Processing Failed".
+      imageStatus: 'uploaded',
     })
     .returning({ id: listings.id });
 
@@ -55,24 +81,64 @@ export async function persistGeneratedCopy(
     .update(listings)
     .set({
       generatedCopies: sql`COALESCE(${listings.generatedCopies}, '{}'::jsonb) || ${fragment}::jsonb`,
-      status: 'generated',
       updatedAt: new Date(),
     })
     .where(eq(listings.id, dbId));
 
-  // Refresh the dashboard so the status pill flips from 'draft' to 'generated'
-  // (and any copy preview appears) without requiring a hard reload.
+  // The lifecycle transition to 'generated' is owned by markListingAsGenerated
+  // (fired once all selected platforms succeed). Don't flip status per-platform
+  // here — that would mark the row 'generated' after only one platform finished.
+  revalidatePath('/dashboard');
+}
+
+// Final lifecycle transition fired by the client once every selected platform's
+// stream reaches 'success'. Separates per-platform JSONB merging from the
+// row-level state machine so a partial generation never claims completion.
+export async function markListingAsGenerated(listingId: string): Promise<void> {
+  await db
+    .update(listings)
+    .set({
+      status: 'generated',
+      imageStatus: 'processed',
+      updatedAt: new Date(),
+    })
+    .where(eq(listings.id, listingId));
+
   revalidatePath('/dashboard');
 }
 
 export async function deleteListing(id: string): Promise<void> {
-  // CLAUDE.md constraint #2 (Two-Phase Deletion): R2 object cleanup MUST run
-  // BEFORE the DB delete once R2 upload lands (Phase 4). Order matters —
-  // if DB deletes first, an R2 failure leaves zombie objects with no row
-  // to find them by, accumulating storage cost.
-  // TODO(phase-4): delete originalImageKey + thumbnailKey from R2 here.
+  const sessionId = await getAnonSessionId();
+  if (!sessionId) return;
 
-  await db.delete(listings).where(eq(listings.id, id));
+  // Scope the lookup to the caller's session so one visitor can't delete
+  // another's listing by guessing its id. Fetch first to recover the R2 keys
+  // the two-phase delete needs.
+  const [row] = await db
+    .select({
+      originalImageKey: listings.originalImageKey,
+      thumbnailKey: listings.thumbnailKey,
+    })
+    .from(listings)
+    .where(and(eq(listings.id, id), eq(listings.anonymousSessionId, sessionId)))
+    .limit(1);
+
+  // Missing OR owned by another session → no-op. Same opacity as the detail
+  // page's 404: we never distinguish "doesn't exist" from "not yours".
+  if (!row) return;
+
+  // CLAUDE.md constraint #2 (Two-Phase Deletion): R2 objects MUST be deleted
+  // BEFORE the DB row. The order is load-bearing — if the row goes first and
+  // the R2 delete then fails, the keys are gone and the objects become
+  // unreachable zombies that bill forever. Do NOT rely on onDelete:'cascade'.
+  // Phase 4 wires the actual S3 DeleteObjects call here, gated on the keys
+  // existing, and only proceeds to the DB delete once R2 confirms:
+  //   const keys = [row.originalImageKey, row.thumbnailKey].filter(Boolean);
+  //   if (keys.length) await deleteR2Objects(keys);
+
+  await db
+    .delete(listings)
+    .where(and(eq(listings.id, id), eq(listings.anonymousSessionId, sessionId)));
 
   revalidatePath('/dashboard');
 }
