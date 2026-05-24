@@ -1,7 +1,7 @@
 # Snaplist V1.0 (SaaS Ready) — Engineering Check List
 
 **Architecture Decision:** Next.js 15 App Router + Serverless + Parallel Streaming
-**Infrastructure:** Auth.js (OAuth) + Neon DB (Drizzle) + Cloudflare R2 (Storage) + Upstash Redis (Rate Limit) + Google Gemini (Gemini 2.5 Flash)
+**Infrastructure:** Auth.js (OAuth) + Neon DB (Drizzle) + Cloudflare R2 (Storage) + Upstash Redis (Rate Limit) + Google Gemini (Gemini 3.1 Flash)
 
 ---
 
@@ -17,7 +17,7 @@ We are expanding the original 4-stage MVP into a 5-stage pipeline that includes 
 - User drags and drops an image. **[Pre-action]** Triggers Upstash Redis rate-limit validation (3 times/day for anonymous, 20 times/day for logged-in users).
 - Client-side performs hard compression (limiting max edge and file size) before uploading to `/api/upload`.
 - Backend uses **Sharp** to validate the format, generate a thumbnail, and asynchronously upload to Cloudflare R2. Simultaneously, a `listings` record with a `pending` status is created in the database.
-- Calls Google Gemini Vision (`gemini-2.5-flash`) via `@ai-sdk/google` with `generateObject` to extract image metadata (brand, condition, suggested price, etc.) and returns it to the frontend.
+- Calls Google Gemini Vision (`gemini-3.1-flash`) via `@ai-sdk/google` with `generateObject` to extract image metadata (brand, condition, suggested price, etc.) and returns it to the frontend.
 
 ### Stage 2 — Review & Smart Merge
 - The frontend form displays the AI-extracted data alongside the thumbnail.
@@ -25,7 +25,7 @@ We are expanding the original 4-stage MVP into a 5-stage pipeline that includes 
 
 ### Stage 3 — Parallel Generate
 - User clicks "Generate". The frontend **aborts** any ongoing legacy network requests.
-- Triggers parallel streaming APIs using `@ai-sdk/google` `streamText` with `gemini-2.5-flash` to generate copy for three platforms (Rednote, Facebook, eBay). The streamed text is returned in real-time via SSE and simultaneously written back to the `generatedCopies` field in the database.
+- Triggers parallel streaming APIs using `@ai-sdk/google` `streamText` with `gemini-3.1-flash` to generate copy for three platforms (Rednote, Facebook, eBay). The streamed text is returned in real-time via SSE and simultaneously written back to the `generatedCopies` field in the database.
 
 ### Stage 4 — Render & Dashboard
 - The copy is rendered with a typewriter effect inside isolated `<ListingEditor>` components.
@@ -82,12 +82,12 @@ export const listings = pgTable('listings', {
 
 ### A. `/api/upload` — Upload, Rate Limit & Feature Extraction
 - **Pre-processing**: Interceptor executes Upstash Ratelimit. Returns a `429` status if exceeded.
-- **Action**: Receives Base64 → Sharp generates Thumbnail → Concurrent streaming upload to Cloudflare R2 → Creates DB Draft record → Calls Gemini 2.5 Flash via `@ai-sdk/google` `generateObject` for feature extraction with Zod schema validation.
+- **Action**: Receives Base64 → Sharp generates Thumbnail → Concurrent streaming upload to Cloudflare R2 → Creates DB Draft record → Calls Gemini 3.1 Flash via `@ai-sdk/google` `generateObject` for feature extraction with Zod schema validation.
 - **Returns**: `{ dbId, metadata, thumbnailUrl }`
 
 ### B. `/api/generate` — Parallel Streaming Generation
 - **Receives**: `{ dbId, metadata, platform }`
-- **Action**: Loads the platform-specific Prompt to execute `streamText` with `gemini-2.5-flash`. Upon stream completion, asynchronously triggers a Server Action to write the generated content back to the `generatedCopies` field of the corresponding DB record.
+- **Action**: Loads the platform-specific Prompt to execute `streamText` with `gemini-3.1-flash`. Upon stream completion, asynchronously triggers a Server Action to write the generated content back to the `generatedCopies` field of the corresponding DB record.
 - **Returns**: `text/event-stream`
 
 ### C. Server Action: `claimAnonymousListings`
@@ -114,7 +114,7 @@ Drizzle's JSONB `$type<>` is only a compile-time illusion. Before rendering the 
 You MUST configure `serverComponentsExternalPackages: ['sharp']` in `next.config.js`, and set `memory: 1024` and `maxDuration: 30` in `vercel.json` for the relevant functions to prevent OOM errors and timeouts.
 
 **Gemini Rate Limit Awareness**
-`gemini-2.5-flash` free tier has strict limits (RPM: 5, RPD: 20). Production deployment should either upgrade to paid tier OR implement application-level request queuing. Anonymous users should be limited at the Upstash layer BEFORE hitting Gemini to avoid burning quota.
+`gemini-3.1-flash` free tier has strict limits (RPM: 5, RPD: 20). Production deployment should either upgrade to paid tier OR implement application-level request queuing. Anonymous users should be limited at the Upstash layer BEFORE hitting Gemini to avoid burning quota.
 
 ### [Frontend & UI Constraints]
 

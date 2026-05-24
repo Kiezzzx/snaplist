@@ -6,7 +6,7 @@ import { Check } from 'lucide-react';
 import { UploadZone } from '@/components/listings/upload-zone';
 import { MetadataForm } from '@/components/listings/metadata-form';
 import { ListingEditor } from '@/components/listings/listing-editor';
-import { markListingAsGenerated } from '@/lib/actions/listings';
+import { markListingAsGenerated, updateListingMetadata } from '@/lib/actions/listings';
 import type { ProductMetadata, Platform } from '@/lib/types';
 
 const platformNumbers: Record<Platform, string> = {
@@ -76,7 +76,11 @@ export default function Home() {
         return;
       }
       if (res.status === 429) {
-        setExtractError('AI service is busy. Please wait a moment and try again.');
+        // Two 429 sources now: our daily rate limit (code RATE_LIMIT) and
+        // Gemini's transient quota error (code AI_BUSY). The route sends a
+        // tailored message for each — surface it, with a generic fallback.
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setExtractError(body?.error ?? 'Too many requests. Please wait a moment and try again.');
         return;
       }
       if (res.status >= 500) {
@@ -110,6 +114,15 @@ export default function Home() {
   function onSubmit(metadata: ProductMetadata, platforms: Platform[]) {
     setTargetMetadata(metadata);
     setSelectedPlatforms(platforms);
+    // Persist the reviewed metadata onto the row so the dashboard reflects the
+    // user's edits (e.g. corrected condition), not the AI's extraction-time
+    // values. Fire-and-forget: it writes only the metadata column, so it can't
+    // race the generate path's generatedCopies/status writes.
+    if (dbId) {
+      updateListingMetadata(dbId, metadata).catch((err) => {
+        console.error('Failed to persist edited metadata:', err);
+      });
+    }
     setGenerateTriggerId(Date.now());
     // Reset the mark-once guard so the new run can fire markListingAsGenerated.
     markedTriggerRef.current = 0;

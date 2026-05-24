@@ -2,6 +2,8 @@ import sharp from 'sharp';
 import type { ProductMetadata } from '@/lib/types';
 import { createListing } from '@/lib/actions/listings';
 import { extractProductMetadata } from '@/lib/ai/extract-metadata';
+import { getAnonSessionId } from '@/lib/session';
+import { checkRateLimit, getClientIdentifier } from '@/lib/ratelimit';
 import type { ListingMetadata } from '@/lib/db/schema';
 
 const MAX_PAYLOAD_BYTES = 4.5 * 1024 * 1024;
@@ -49,6 +51,34 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    // Rate limit AFTER the cheap local guards (so junk/oversized requests don't
+    // burn a user's daily quota) but BEFORE Sharp + Gemini (so a throttled
+    // request never spends Gemini quota). CLAUDE.md #5.
+    // Auth hook: when Auth.js lands, resolve the session userId → tier 'auth'
+    // (20/day) keyed on the user id. Until then every caller is anonymous.
+    const anonSessionId = await getAnonSessionId();
+    const identifier = getClientIdentifier(request, anonSessionId);
+    const decision = await checkRateLimit(identifier, 'anon');
+    if (!decision.allowed) {
+      const retryAfterSec = Math.max(1, Math.ceil((decision.reset - Date.now()) / 1000));
+      return Response.json(
+        {
+          success: false,
+          code: 'RATE_LIMIT',
+          error: `Daily limit reached (${decision.limit} free listings/day). Please try again later.`,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(retryAfterSec),
+            'X-RateLimit-Limit': String(decision.limit),
+            'X-RateLimit-Remaining': String(decision.remaining),
+            'X-RateLimit-Reset': String(decision.reset),
+          },
+        },
+      );
+    }
+
     // Run the AI extract and thumbnail build in parallel. Sharp is CPU-bound
     // and Gemini is network-bound, so wall-clock = max(both) instead of sum.
     // TEMP: replace thumbnail generation with R2 upload in Phase 4.
@@ -77,8 +107,10 @@ export async function POST(request: Request): Promise<Response> {
     console.error('Extract API error:', error);
     const msg = error instanceof Error ? error.message : '';
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
+      // Distinct from our own RATE_LIMIT above — this is Gemini's transient
+      // quota error, not the user hitting their daily allowance.
       return Response.json(
-        { success: false, error: 'Rate limit exceeded. Please try again later.' },
+        { success: false, code: 'AI_BUSY', error: 'AI service is busy. Please wait a moment and try again.' },
         { status: 429 }
       );
     }
