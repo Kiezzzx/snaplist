@@ -1,31 +1,16 @@
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ImageIcon } from 'lucide-react';
 import { db } from '@/lib/db';
 import { listings } from '@/lib/db/schema';
+import { listingMetadataSchema, generatedCopiesSchema } from '@/lib/db/validators';
 import { getAnonSessionId } from '@/lib/session';
 import { ListingPlatformTabs } from '@/components/dashboard/listing-platform-tabs';
 
-// CLAUDE.md constraint #3 — Drizzle's $type<> is compile-time only, so JSONB
-// columns must be re-parsed at the read boundary. A historical row with
-// drifted shape would otherwise crash the page instead of degrading gracefully.
-const metadataSchema = z.object({
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  condition: z.string().optional(),
-  category: z.string().optional(),
-  suggestedPrice: z.number().optional(),
-  notes: z.string().optional(),
-});
-
-const copySchema = z.object({ content: z.string() }).optional();
-const generatedCopiesSchema = z.object({
-  Rednote: copySchema,
-  Facebook: copySchema,
-  eBay: copySchema,
-});
+// Runtime parse on read via the shared schemas in lib/db/validators
+// (CLAUDE.md constraint #3 — Drizzle's $type<> is compile-time only, so a
+// historical row with drifted shape degrades gracefully instead of crashing).
 
 const dateFmt = new Intl.DateTimeFormat('en-AU', {
   dateStyle: 'medium',
@@ -61,7 +46,7 @@ export default async function ListingDetailPage({
     notFound();
   }
 
-  const parsedMetadata = row.metadata ? metadataSchema.safeParse(row.metadata) : null;
+  const parsedMetadata = row.metadata ? listingMetadataSchema.safeParse(row.metadata) : null;
   const metadata = parsedMetadata?.success ? parsedMetadata.data : null;
 
   const parsedCopies = row.generatedCopies

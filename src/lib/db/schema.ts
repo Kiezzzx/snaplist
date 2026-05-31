@@ -8,24 +8,15 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { users } from './auth-schema';
+import type { ListingMetadata, GeneratedCopies } from './validators';
 
 type ImageStatus = 'pending' | 'uploaded' | 'processed' | 'failed';
 type ListingStatus = 'draft' | 'generated' | 'sold';
 
-export type ListingMetadata = {
-  brand?: string;
-  model?: string;
-  condition?: string;
-  category?: string;
-  suggestedPrice?: number;
-  notes?: string;
-};
-
-export type GeneratedCopies = {
-  Rednote?: { content: string };
-  Facebook?: { content: string };
-  eBay?: { content: string };
-};
+// JSONB shapes live in ./validators as the single source (type + runtime Zod
+// guard derived together). Re-exported here so existing `from '@/lib/db/schema'`
+// imports keep working.
+export type { ListingMetadata, GeneratedCopies };
 
 export const listings = pgTable(
   'listings',

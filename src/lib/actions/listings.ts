@@ -5,21 +5,11 @@ import { sql, eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { listings, type ListingMetadata } from '@/lib/db/schema';
+import { listingMetadataSchema } from '@/lib/db/validators';
 import { getAnonSessionId } from '@/lib/session';
 import type { Platform } from '@/lib/types';
 
-// Mirrors ListingMetadata $type for runtime parse — CLAUDE.md hard constraint #3
-// requires Zod at the boundary because Drizzle's $type is compile-time only.
-const metadataSchema = z.object({
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  condition: z.string().optional(),
-  category: z.string().optional(),
-  suggestedPrice: z.number().optional(),
-  notes: z.string().optional(),
-});
-
-export type CreateListingInput = z.infer<typeof metadataSchema>;
+export type CreateListingInput = z.infer<typeof listingMetadataSchema>;
 
 // TEMP: replace with R2 in Phase 4. Optional thumbnail bag — kept as a
 // second positional arg so the R2 cutover only deletes this param + the
@@ -32,7 +22,7 @@ export async function createListing(
   metadata: CreateListingInput,
   options: CreateListingOptions = {},
 ): Promise<string> {
-  const parsed = metadataSchema.parse(metadata);
+  const parsed = listingMetadataSchema.parse(metadata);
 
   // Owner key for the row. Middleware issues this cookie on the upload request,
   // so a missing value here means the request bypassed middleware — fail loudly

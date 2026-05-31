@@ -1,5 +1,7 @@
 // src/lib/types.ts
 
+import type { Platform } from './platforms';
+
 /**
  * Core product metadata.
  * Contains data extracted by AI and manually adjusted by the user.
@@ -30,8 +32,10 @@ export type GenerationStatus = 'idle' | 'loading' | 'success' | 'error';
 
 /**
  * Supported publishing platforms.
+ * Defined in lib/platforms.ts (the single source for platform config);
+ * re-exported here so existing `from '@/lib/types'` imports keep working.
  */
-export type Platform = 'Rednote' | 'Facebook' | 'eBay';
+export type { Platform };
 
 /**
  * Listing state for a single platform.

@@ -1,7 +1,7 @@
 # Snaplist V1.0 (SaaS Ready) — Engineering Check List
 
-**Architecture Decision:** Next.js 15 App Router + Serverless + Parallel Streaming
-**Infrastructure:** Auth.js (OAuth) + Neon DB (Drizzle) + Cloudflare R2 (Storage) + Upstash Redis (Rate Limit) + Google Gemini (Gemini 3.1 Flash)
+**Architecture Decision:** Next.js 16 App Router + Serverless + Parallel Streaming
+**Infrastructure:** Auth.js (OAuth) + Neon DB (Drizzle) + Cloudflare R2 (Storage) + Upstash Redis (Rate Limit) + Google Gemini (Gemini 3.1 Flash-Lite)
 
 ---
 
@@ -15,9 +15,9 @@ We are expanding the original 4-stage MVP into a 5-stage pipeline that includes 
 
 ### Stage 1 — Upload & Extract
 - User drags and drops an image. **[Pre-action]** Triggers Upstash Redis rate-limit validation (3 times/day for anonymous, 20 times/day for logged-in users).
-- Client-side performs hard compression (limiting max edge and file size) before uploading to `/api/upload`.
+- Client-side performs hard compression (limiting max edge and file size) before uploading to `/api/extract`.
 - Backend uses **Sharp** to validate the format, generate a thumbnail, and asynchronously upload to Cloudflare R2. Simultaneously, a `listings` record with a `pending` status is created in the database.
-- Calls Google Gemini Vision (`gemini-3.1-flash`) via `@ai-sdk/google` with `generateObject` to extract image metadata (brand, condition, suggested price, etc.) and returns it to the frontend.
+- Calls Google Gemini Vision (`gemini-3.1-flash-lite`) via `@ai-sdk/google` with `generateObject` to extract image metadata (brand, condition, suggested price, etc.) and returns it to the frontend.
 
 ### Stage 2 — Review & Smart Merge
 - The frontend form displays the AI-extracted data alongside the thumbnail.
@@ -25,7 +25,7 @@ We are expanding the original 4-stage MVP into a 5-stage pipeline that includes 
 
 ### Stage 3 — Parallel Generate
 - User clicks "Generate". The frontend **aborts** any ongoing legacy network requests.
-- Triggers parallel streaming APIs using `@ai-sdk/google` `streamText` with `gemini-3.1-flash` to generate copy for three platforms (Rednote, Facebook, eBay). The streamed text is returned in real-time via SSE and simultaneously written back to the `generatedCopies` field in the database.
+- Triggers parallel streaming APIs using `@ai-sdk/google` `streamText` with `gemini-3.1-flash-lite` to generate copy for three platforms (Rednote, Facebook, eBay). The streamed text is returned in real-time as a plain-text stream (`text/plain`, consumed on the client with `streamProtocol: 'text'`) and, on stream completion, written back to the `generatedCopies` field in the database.
 
 ### Stage 4 — Render & Dashboard
 - The copy is rendered with a typewriter effect inside isolated `<ListingEditor>` components.
@@ -76,21 +76,24 @@ export const listings = pgTable('listings', {
 }));
 ```
 
+> **Note (current build):** the live schema additionally carries a temporary `thumbnailBase64` column that inlines a 100×100 webp data URI. It is a pre-R2 placeholder so the dashboard has something to render before Cloudflare R2 lands; it is removed once R2 is wired in Phase 4. The `originalImageKey` / `thumbnailKey` fields above remain the Phase-4 target.
+
 ---
 
 ## 3. Core API Signatures (API Routes & Server Actions)
 
-### A. `/api/upload` — Upload, Rate Limit & Feature Extraction
+### A. `/api/extract` — Upload, Rate Limit & Feature Extraction
 - **Pre-processing**: Interceptor executes Upstash Ratelimit. Returns a `429` status if exceeded.
-- **Action**: Receives Base64 → Sharp generates Thumbnail → Concurrent streaming upload to Cloudflare R2 → Creates DB Draft record → Calls Gemini 3.1 Flash via `@ai-sdk/google` `generateObject` for feature extraction with Zod schema validation.
+- **Action**: Receives Base64 → Sharp generates Thumbnail → Concurrent streaming upload to Cloudflare R2 → Creates DB Draft record → Calls Gemini 3.1 Flash-Lite via `@ai-sdk/google` `generateObject` for feature extraction with Zod schema validation.
 - **Returns**: `{ dbId, metadata, thumbnailUrl }`
 
 ### B. `/api/generate` — Parallel Streaming Generation
 - **Receives**: `{ dbId, metadata, platform }`
-- **Action**: Loads the platform-specific Prompt to execute `streamText` with `gemini-3.1-flash`. Upon stream completion, asynchronously triggers a Server Action to write the generated content back to the `generatedCopies` field of the corresponding DB record.
-- **Returns**: `text/event-stream`
+- **Action**: Loads the platform-specific Prompt to execute `streamText` with `gemini-3.1-flash-lite`. Upon stream completion, asynchronously triggers a Server Action to write the generated content back to the `generatedCopies` field of the corresponding DB record.
+- **Returns**: `text/plain` (consumed on the client with `streamProtocol: 'text'`)
 
 ### C. Server Action: `claimAnonymousListings`
+- **Status: NOT YET IMPLEMENTED (Phase 2 — Auth).** `auth-schema.ts` is currently only a `users` stub; no claim action exists yet. Planned design below.
 - **Action**: Triggered by the OAuth callback. Finds records in the database where `anonymousSessionId` matches the current Cookie and `userId` is null, then updates the `userId` to the currently logged-in user's ID.
 
 ---
@@ -114,12 +117,12 @@ Drizzle's JSONB `$type<>` is only a compile-time illusion. Before rendering the 
 You MUST configure `serverComponentsExternalPackages: ['sharp']` in `next.config.js`, and set `memory: 1024` and `maxDuration: 30` in `vercel.json` for the relevant functions to prevent OOM errors and timeouts.
 
 **Gemini Rate Limit Awareness**
-`gemini-3.1-flash` free tier has strict limits (RPM: 5, RPD: 20). Production deployment should either upgrade to paid tier OR implement application-level request queuing. Anonymous users should be limited at the Upstash layer BEFORE hitting Gemini to avoid burning quota.
+`gemini-3.1-flash-lite` free tier has strict limits (RPM: 5, RPD: 20). Production deployment should either upgrade to paid tier OR implement application-level request queuing. Anonymous users should be limited at the Upstash layer BEFORE hitting Gemini to avoid burning quota.
 
 ### [Frontend & UI Constraints]
 
 **State Isolation & Localized Streaming**
-The SSE generation state (`content`, `isLoading`) MUST be locked entirely within the bottom-level `<ListingEditor>` component. Hoisting the typewriter effect state to a global Store or parent Page is strictly prohibited to prevent page-level render avalanches (unnecessary re-renders).
+The streaming generation state (`content`, `isLoading`) MUST be locked entirely within the bottom-level `<ListingEditor>` component. Hoisting the typewriter effect state to a global Store or parent Page is strictly prohibited to prevent page-level render avalanches (unnecessary re-renders).
 
 **Asynchronous State Machine Healing**
 When the frontend fetches historical records, if it detects `imageStatus === 'pending'` and the `updatedAt` is older than 2 minutes, the UI MUST render a "Processing Failed" state and provide a retry button. Do not leave the user stuck in an infinite loading spinner.

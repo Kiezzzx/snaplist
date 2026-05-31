@@ -1,59 +1,34 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { UploadZone } from '@/components/listings/upload-zone';
 import { MetadataForm } from '@/components/listings/metadata-form';
 import { ListingEditor } from '@/components/listings/listing-editor';
-import { markListingAsGenerated, updateListingMetadata } from '@/lib/actions/listings';
+import { useListingGeneration } from '@/hooks/use-listing-generation';
 import type { ProductMetadata, Platform } from '@/lib/types';
-
-const platformNumbers: Record<Platform, string> = {
-  Rednote: '01',
-  Facebook: '02',
-  eBay: '03',
-};
+import { PLATFORM_META } from '@/lib/platforms';
 
 export default function Home() {
   const [aiData, setAiData] = useState<Partial<ProductMetadata> | null>(null);
   const [dbId, setDbId] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
-  const [targetMetadata, setTargetMetadata] = useState<ProductMetadata | null>(null);
-  const [generateTriggerId, setGenerateTriggerId] = useState(0);
+  // activeTab is pure presentation (which output tab is shown) and stays here;
+  // all cross-platform generation coordination lives in the hook below.
   const [activeTab, setActiveTab] = useState<Platform>('Rednote');
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([
-    'Rednote',
-    'Facebook',
-    'eBay',
-  ]);
-  const [hasGenerated, setHasGenerated] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [platformStatuses, setPlatformStatuses] = useState<Record<Platform, string>>({
-    Rednote: 'idle',
-    Facebook: 'idle',
-    eBay: 'idle',
-  });
-  // Keep selectedPlatforms in a ref so handleStatusChange (called from child callbacks)
-  // never reads a stale snapshot when checking "are all selected platforms done?"
-  const selectedPlatformsRef = useRef<Platform[]>(selectedPlatforms);
-  useEffect(() => {
-    selectedPlatformsRef.current = selectedPlatforms;
-  }, [selectedPlatforms]);
-  // Same staleness guard for dbId — handleStatusChange fires from child callbacks
-  // and needs the latest id at the moment all platforms finish.
-  const dbIdRef = useRef<string | null>(dbId);
-  useEffect(() => {
-    dbIdRef.current = dbId;
-  }, [dbId]);
-  // Fire markListingAsGenerated at most once per generation run; otherwise each
-  // straggler 'success' callback would re-trigger the DB write.
-  const markedTriggerRef = useRef<number>(0);
-  const generateTriggerIdRef = useRef<number>(0);
-  useEffect(() => {
-    generateTriggerIdRef.current = generateTriggerId;
-  }, [generateTriggerId]);
+
+  const {
+    triggerId,
+    platformStatuses,
+    selectedPlatforms,
+    targetMetadata,
+    isGenerating,
+    hasGenerated,
+    startGeneration,
+    handleStatusChange,
+  } = useListingGeneration(dbId);
 
   async function onImageProcessed(base64: string) {
     setIsExtracting(true);
@@ -111,66 +86,11 @@ export default function Home() {
     }
   }
 
-  function onSubmit(metadata: ProductMetadata, platforms: Platform[]) {
-    setTargetMetadata(metadata);
-    setSelectedPlatforms(platforms);
-    // Persist the reviewed metadata onto the row so the dashboard reflects the
-    // user's edits (e.g. corrected condition), not the AI's extraction-time
-    // values. Fire-and-forget: it writes only the metadata column, so it can't
-    // race the generate path's generatedCopies/status writes.
-    if (dbId) {
-      updateListingMetadata(dbId, metadata).catch((err) => {
-        console.error('Failed to persist edited metadata:', err);
-      });
-    }
-    setGenerateTriggerId(Date.now());
-    // Reset the mark-once guard so the new run can fire markListingAsGenerated.
-    markedTriggerRef.current = 0;
+  function handleGenerate(metadata: ProductMetadata, platforms: Platform[]) {
+    startGeneration(metadata, platforms);
+    // Surface the first selected platform's tab when a run starts. Presentation
+    // only, so it stays in the page rather than the coordination hook.
     setActiveTab(platforms[0]);
-    setHasGenerated(true);
-    setIsGenerating(true);
-    // Selected platforms -> loading; unselected -> idle so all-done check
-    // can't be blocked by a stale 'loading' from a previous generation.
-    setPlatformStatuses(() => {
-      const next: Record<Platform, string> = { Rednote: 'idle', Facebook: 'idle', eBay: 'idle' };
-      for (const p of platforms) {
-        next[p] = 'loading';
-      }
-      return next;
-    });
-  }
-
-  function handleStatusChange(platform: Platform, status: string) {
-    console.log(`${platform}: ${status}`);
-    setPlatformStatuses((prev) => {
-      const next = { ...prev, [platform]: status };
-      // Read selectedPlatforms via ref to avoid stale-closure mistakes
-      // when this callback is invoked from a child during a render cycle.
-      const allDone = selectedPlatformsRef.current.every(
-        (p) => next[p] === 'success' || next[p] === 'error'
-      );
-      if (allDone) {
-        setIsGenerating(false);
-        const allSuccess = selectedPlatformsRef.current.every(
-          (p) => next[p] === 'success'
-        );
-        const id = dbIdRef.current;
-        const trigger = generateTriggerIdRef.current;
-        // Only mark the row 'generated' when EVERY selected platform succeeded —
-        // a partial run (any 'error') stays in 'draft' so the user can retry.
-        // The markedTriggerRef guard prevents duplicate writes if multiple
-        // success callbacks somehow flush during the same trigger window.
-        if (allSuccess && id && trigger > 0 && markedTriggerRef.current !== trigger) {
-          markedTriggerRef.current = trigger;
-          markListingAsGenerated(id).catch((err) => {
-            console.error('Failed to mark listing as generated:', err);
-            // Reset so a retry can re-attempt the transition.
-            markedTriggerRef.current = 0;
-          });
-        }
-      }
-      return next;
-    });
   }
 
   return (
@@ -241,7 +161,7 @@ export default function Home() {
               </div>
               <MetadataForm
                 aiData={aiData}
-                onSubmit={onSubmit}
+                onSubmit={handleGenerate}
                 isGenerating={isGenerating}
                 hasGenerated={hasGenerated}
               />
@@ -278,7 +198,7 @@ export default function Home() {
                       }
                     `}
                   >
-                    <span className="mr-1 md:mr-2 font-bold">{platformNumbers[platform]}</span>
+                    <span className="mr-1 md:mr-2 font-bold">{PLATFORM_META[platform].number}</span>
                     {platform}
                     {/* Per-tab status so users see ALL platform results, not just the active one.
                         Shape AND color differentiate the four states so color-blind users
@@ -320,7 +240,7 @@ export default function Home() {
                 platform="Rednote"
                 metadata={targetMetadata}
                 dbId={dbId}
-                triggerId={selectedPlatforms.includes('Rednote') ? generateTriggerId : 0}
+                triggerId={selectedPlatforms.includes('Rednote') ? triggerId : 0}
                 isActive={activeTab === 'Rednote'}
                 onStatusChange={handleStatusChange}
               />
@@ -330,7 +250,7 @@ export default function Home() {
                 platform="Facebook"
                 metadata={targetMetadata}
                 dbId={dbId}
-                triggerId={selectedPlatforms.includes('Facebook') ? generateTriggerId : 0}
+                triggerId={selectedPlatforms.includes('Facebook') ? triggerId : 0}
                 isActive={activeTab === 'Facebook'}
                 onStatusChange={handleStatusChange}
               />
@@ -340,7 +260,7 @@ export default function Home() {
                 platform="eBay"
                 metadata={targetMetadata}
                 dbId={dbId}
-                triggerId={selectedPlatforms.includes('eBay') ? generateTriggerId : 0}
+                triggerId={selectedPlatforms.includes('eBay') ? triggerId : 0}
                 isActive={activeTab === 'eBay'}
                 onStatusChange={handleStatusChange}
               />

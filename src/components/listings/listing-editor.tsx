@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useCompletion } from '@ai-sdk/react';
 import type { Platform, ProductMetadata } from '@/lib/types';
+import { PLATFORM_META, PLATFORM_STAGGER_MS } from '@/lib/platforms';
 
 interface ListingEditorProps {
   platform: Platform;
@@ -14,20 +15,6 @@ interface ListingEditorProps {
   isActive: boolean;
   onStatusChange: (platform: Platform, status: string) => void;
 }
-
-const platformNumbers: Record<Platform, string> = {
-  Rednote: '01',
-  Facebook: '02',
-  eBay: '03',
-};
-
-// Stagger requests slightly so 3 concurrent calls don't all hit Gemini in the same tick
-// (the most common cause of one-platform-succeeds, others-get-429).
-const PLATFORM_STAGGER_MS: Record<Platform, number> = {
-  Rednote: 0,
-  Facebook: 250,
-  eBay: 500,
-};
 
 function isAbortError(err: unknown): boolean {
   if (!err) return false;
@@ -139,7 +126,7 @@ export function ListingEditor({
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <span className="text-3xl font-black text-gray-200">{platformNumbers[platform]}</span>
+            <span className="text-3xl font-black text-gray-200">{PLATFORM_META[platform].number}</span>
             <div>
               <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
                 Platform

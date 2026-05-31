@@ -1,5 +1,5 @@
 import { after } from 'next/server';
-import type { Platform } from '@/lib/types';
+import { isPlatform } from '@/lib/platforms';
 import { persistGeneratedCopy } from '@/lib/actions/listings';
 import { streamListing } from '@/lib/ai/generate-listing';
 
@@ -14,7 +14,7 @@ export async function POST(request: Request): Promise<Response> {
     const body = (await request.json()) as GenerateRequestBody;
 
     const prompt = body.prompt;
-    const platform = body.platform as Platform;
+    const platform = body.platform;
     const dbId = body.dbId;
 
     console.log('Generate request:', { platform, dbId, promptLength: prompt?.length });
@@ -26,7 +26,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    if (!['Rednote', 'Facebook', 'eBay'].includes(platform)) {
+    if (!isPlatform(platform)) {
       return Response.json(
         { error: 'Invalid platform' },
         { status: 400 }

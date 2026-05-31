@@ -1,9 +1,9 @@
 import { desc, eq, sql } from 'drizzle-orm';
-import { z } from 'zod';
 import Link from 'next/link';
 import { AlertTriangle, Check, ImageIcon } from 'lucide-react';
 import { db } from '@/lib/db';
 import { listings } from '@/lib/db/schema';
+import { listingMetadataSchema, generatedCopiesSchema } from '@/lib/db/validators';
 import { getAnonSessionId } from '@/lib/session';
 import { DashboardDeleteButton } from '@/components/dashboard/delete-button';
 
@@ -16,24 +16,9 @@ const statusPillClasses: Record<string, string> = {
   Sold: 'border-blue-600/30 bg-blue-50 text-blue-700',
 };
 
-// Defensive runtime parse on read — Drizzle's $type<> is compile-time only,
-// so historical rows or AI-drift JSON could crash rendering without this.
-// CLAUDE.md constraint #3.
-const metadataSchema = z.object({
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  condition: z.string().optional(),
-  category: z.string().optional(),
-  suggestedPrice: z.number().optional(),
-  notes: z.string().optional(),
-});
-
-const copySchema = z.object({ content: z.string() }).optional();
-const generatedCopiesSchema = z.object({
-  Rednote: copySchema,
-  Facebook: copySchema,
-  eBay: copySchema,
-});
+// Runtime parse on read happens via the shared schemas in lib/db/validators
+// (CLAUDE.md constraint #3 — Drizzle's $type<> is compile-time only, so
+// historical rows or AI-drift JSON could otherwise crash rendering).
 
 type PlatformKey = 'Rednote' | 'Facebook' | 'eBay';
 const platformIndicators: Array<{ key: PlatformKey; label: string }> = [
@@ -133,7 +118,7 @@ export default async function DashboardPage() {
         <ul className="divide-y divide-[#D0CFC9] border-t border-b border-[#D0CFC9]">
           {rows.map((row) => {
             const parsedMetadata = row.metadata
-              ? metadataSchema.safeParse(row.metadata)
+              ? listingMetadataSchema.safeParse(row.metadata)
               : null;
             const metadata = parsedMetadata?.success ? parsedMetadata.data : null;
             const brand = metadata?.brand ?? null;

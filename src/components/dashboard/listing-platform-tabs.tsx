@@ -3,22 +3,7 @@
 import { useState } from 'react';
 import { Check } from 'lucide-react';
 import type { GeneratedCopies } from '@/lib/db/schema';
-
-type Platform = 'Rednote' | 'Facebook' | 'eBay';
-
-const platformOrder: Platform[] = ['Rednote', 'Facebook', 'eBay'];
-
-const platformNumbers: Record<Platform, string> = {
-  Rednote: '01',
-  Facebook: '02',
-  eBay: '03',
-};
-
-const platformLabels: Record<Platform, string> = {
-  Rednote: 'Rednote',
-  Facebook: 'Facebook',
-  eBay: 'eBay',
-};
+import { PLATFORMS, PLATFORM_META, type Platform } from '@/lib/platforms';
 
 interface ListingPlatformTabsProps {
   copies: GeneratedCopies | null;
@@ -54,7 +39,7 @@ export function ListingPlatformTabs({ copies }: ListingPlatformTabsProps) {
       </div>
 
       <div className="flex items-end gap-2 md:gap-6 border-b border-[#D0CFC9] overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
-        {platformOrder.map((platform) => {
+        {PLATFORMS.map((platform) => {
           const isActive = activeTab === platform;
           const platformHasContent = (copies?.[platform]?.content ?? '').length > 0;
           return (
@@ -71,8 +56,8 @@ export function ListingPlatformTabs({ copies }: ListingPlatformTabsProps) {
                 }
               `}
             >
-              <span className="mr-1 md:mr-2 font-bold">{platformNumbers[platform]}</span>
-              {platformLabels[platform]}
+              <span className="mr-1 md:mr-2 font-bold">{PLATFORM_META[platform].number}</span>
+              {PLATFORM_META[platform].label}
               {platformHasContent ? (
                 <Check
                   className="ml-1.5 inline-block h-3 w-3 align-middle text-green-600"
@@ -93,14 +78,14 @@ export function ListingPlatformTabs({ copies }: ListingPlatformTabsProps) {
         <div className="mb-6 flex items-start justify-between">
           <div className="flex items-center gap-3">
             <span className="text-3xl font-black text-gray-200">
-              {platformNumbers[activeTab]}
+              {PLATFORM_META[activeTab].number}
             </span>
             <div>
               <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
                 Platform
               </p>
               <p className="text-base font-bold uppercase tracking-tight">
-                {platformLabels[activeTab]}
+                {PLATFORM_META[activeTab].label}
               </p>
             </div>
           </div>
