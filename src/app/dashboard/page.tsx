@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { listings } from '@/lib/db/schema';
 import { listingMetadataSchema, generatedCopiesSchema } from '@/lib/db/validators';
 import { getAnonSessionId } from '@/lib/session';
+import { PLATFORMS, type Platform } from '@/lib/platforms';
 import { DashboardDeleteButton } from '@/components/dashboard/delete-button';
 
 // Pill drives the user-visible row lifecycle. Stale-pending rows never reach
@@ -20,12 +21,18 @@ const statusPillClasses: Record<string, string> = {
 // (CLAUDE.md constraint #3 — Drizzle's $type<> is compile-time only, so
 // historical rows or AI-drift JSON could otherwise crash rendering).
 
-type PlatformKey = 'Rednote' | 'Facebook' | 'eBay';
-const platformIndicators: Array<{ key: PlatformKey; label: string }> = [
-  { key: 'Rednote', label: 'RED' },
-  { key: 'Facebook', label: 'FB' },
-  { key: 'eBay', label: 'EBAY' },
-];
+// Short labels for the compact dashboard indicators (not in PLATFORM_META,
+// which carries the full display labels). Order is driven by PLATFORMS so the
+// indicators stay in sync with the canonical platform order.
+const PLATFORM_SHORT_LABELS: Record<Platform, string> = {
+  Facebook: 'FB',
+  eBay: 'EBAY',
+  Rednote: 'RED',
+};
+const platformIndicators = PLATFORMS.map((key) => ({
+  key,
+  label: PLATFORM_SHORT_LABELS[key],
+}));
 
 const dateFmt = new Intl.DateTimeFormat('en-AU', {
   dateStyle: 'medium',

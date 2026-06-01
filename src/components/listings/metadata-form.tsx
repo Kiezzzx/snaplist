@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { ProductMetadata, DirtyState, Platform } from '@/lib/types';
+import { PLATFORMS } from '@/lib/platforms';
 
 interface MetadataFormProps {
   aiData: Partial<ProductMetadata> | null;
@@ -43,16 +44,12 @@ const CATEGORIES = [
 
 const CONDITIONS = ['Brand New', 'Like New', 'Good', 'Fair', 'Poor'];
 
-const ALL_PLATFORMS: Platform[] = ['Rednote', 'Facebook', 'eBay'];
+const ALL_PLATFORMS: Platform[] = [...PLATFORMS];
 
 export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: MetadataFormProps) {
   const [form, setForm] = useState<ProductMetadata>(initialForm);
   const [dirty, setDirty] = useState<DirtyState>(initialDirty);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([
-    'Rednote',
-    'Facebook',
-    'eBay',
-  ]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([...PLATFORMS]);
   const [showSuggested, setShowSuggested] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);

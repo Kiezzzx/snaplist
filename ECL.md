@@ -85,10 +85,10 @@ export const listings = pgTable('listings', {
 ### A. `/api/extract` — Upload, Rate Limit & Feature Extraction
 - **Pre-processing**: Interceptor executes Upstash Ratelimit. Returns a `429` status if exceeded.
 - **Action**: Receives Base64 → Sharp generates Thumbnail → Concurrent streaming upload to Cloudflare R2 → Creates DB Draft record → Calls Gemini 3.1 Flash-Lite via `@ai-sdk/google` `generateObject` for feature extraction with Zod schema validation.
-- **Returns**: `{ dbId, metadata, thumbnailUrl }`
+- **Returns**: `{ success, dbId, metadata }` (`thumbnailUrl` is the Phase-4/R2 target; pre-R2 the thumbnail is stored in the DB as a base64 data URI, not returned)
 
 ### B. `/api/generate` — Parallel Streaming Generation
-- **Receives**: `{ dbId, metadata, platform }`
+- **Receives**: `{ prompt, platform, dbId }` — the client serializes the reviewed metadata into `prompt` (via `useCompletion`); there is no separate `metadata` field on the wire
 - **Action**: Loads the platform-specific Prompt to execute `streamText` with `gemini-3.1-flash-lite`. Upon stream completion, asynchronously triggers a Server Action to write the generated content back to the `generatedCopies` field of the corresponding DB record.
 - **Returns**: `text/plain` (consumed on the client with `streamProtocol: 'text'`)
 

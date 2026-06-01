@@ -8,7 +8,7 @@ import { MetadataForm } from '@/components/listings/metadata-form';
 import { ListingEditor } from '@/components/listings/listing-editor';
 import { useListingGeneration } from '@/hooks/use-listing-generation';
 import type { ProductMetadata, Platform } from '@/lib/types';
-import { PLATFORM_META } from '@/lib/platforms';
+import { PLATFORMS, PLATFORM_META } from '@/lib/platforms';
 
 export default function Home() {
   const [aiData, setAiData] = useState<Partial<ProductMetadata> | null>(null);
@@ -17,7 +17,7 @@ export default function Home() {
   const [extractError, setExtractError] = useState<string | null>(null);
   // activeTab is pure presentation (which output tab is shown) and stays here;
   // all cross-platform generation coordination lives in the hook below.
-  const [activeTab, setActiveTab] = useState<Platform>('Rednote');
+  const [activeTab, setActiveTab] = useState<Platform>(PLATFORMS[0]);
 
   const {
     triggerId,
@@ -235,16 +235,6 @@ export default function Home() {
             </div>
 
             {/* Listing editors */}
-            <div className={activeTab === 'Rednote' ? 'block' : 'hidden'}>
-              <ListingEditor
-                platform="Rednote"
-                metadata={targetMetadata}
-                dbId={dbId}
-                triggerId={selectedPlatforms.includes('Rednote') ? triggerId : 0}
-                isActive={activeTab === 'Rednote'}
-                onStatusChange={handleStatusChange}
-              />
-            </div>
             <div className={activeTab === 'Facebook' ? 'block' : 'hidden'}>
               <ListingEditor
                 platform="Facebook"
@@ -262,6 +252,16 @@ export default function Home() {
                 dbId={dbId}
                 triggerId={selectedPlatforms.includes('eBay') ? triggerId : 0}
                 isActive={activeTab === 'eBay'}
+                onStatusChange={handleStatusChange}
+              />
+            </div>
+            <div className={activeTab === 'Rednote' ? 'block' : 'hidden'}>
+              <ListingEditor
+                platform="Rednote"
+                metadata={targetMetadata}
+                dbId={dbId}
+                triggerId={selectedPlatforms.includes('Rednote') ? triggerId : 0}
+                isActive={activeTab === 'Rednote'}
                 onStatusChange={handleStatusChange}
               />
             </div>
