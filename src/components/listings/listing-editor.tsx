@@ -212,8 +212,12 @@ export function ListingEditor({
                   e.target.style.height = 'auto';
                   setTextHeight(e.target.scrollHeight);
                 }}
-                className="w-full resize-none overflow-hidden border-b-0 bg-transparent p-0 whitespace-pre-wrap font-mono text-sm leading-relaxed text-black focus:outline-none hover:bg-[#FAFAFA]/40 focus:bg-[#FAFAFA]/60 transition-colors"
-                style={{ height: textHeight ? `${textHeight}px` : 'auto' }}
+                className="w-full resize-none overflow-hidden bg-transparent p-0 whitespace-pre-wrap font-mono text-sm leading-relaxed text-black focus:outline-none hover:bg-[#FAFAFA]/40 focus:bg-[#FAFAFA]/60 transition-colors"
+                // borderBottom must be killed inline: the brutalist `border-bottom: 2px solid`
+                // reset in globals.css is *unlayered*, so it outranks any Tailwind utility
+                // (e.g. border-b-0), which lives in @layer utilities. Without this the black
+                // border draws across the content when the height re-measures on tab switch.
+                style={{ height: textHeight ? `${textHeight}px` : 'auto', borderBottom: 'none' }}
               />
             )}
             {/* Status indicator */}
