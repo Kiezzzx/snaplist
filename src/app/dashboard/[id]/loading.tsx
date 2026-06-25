@@ -55,7 +55,7 @@ export default function Loading() {
 
               {/* Brand · Model section */}
               <div className="space-y-3">
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-500">
                   Brand · Model
                 </p>
                 <div
@@ -78,7 +78,7 @@ export default function Loading() {
 
               {/* Price section */}
               <div className="border-t border-[#D0CFC9] pt-6">
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-500">
                   Price
                 </p>
                 <div

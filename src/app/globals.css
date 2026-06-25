@@ -5,14 +5,19 @@
   --bg-light: #FAFAFA;
   --accent: #E8421A;
   --text-primary: #000000;
-  --text-muted: #888888;
-  --text-faint: #BBBBBB;
+  /* Muted/faint tuned to clear WCAG AA (4.5:1) on the --bg surface — the old
+     #888/#BBB were ~3.5:1 and ~1.9:1 (unreadable). */
+  --text-muted: #595959;
+  --text-faint: #6B6B6B;
   --border: #000000;
   --border-light: #E0E0E0;
 }
 
-* {
-  border-radius: 0 !important;
+/* Brutalist corners, softened to a 2px chamfer so surfaces read friendlier
+   without losing the hard-edged identity. .rounded-full is preserved so status
+   dots stay circular. */
+*:not(.rounded-full) {
+  border-radius: 2px !important;
 }
 
 body {

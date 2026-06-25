@@ -32,7 +32,7 @@ export function DashboardDeleteButton({ id }: { id: string }) {
         ${
           isPending
             ? 'cursor-not-allowed text-gray-300'
-            : 'cursor-pointer text-gray-400 hover:text-[#E8421A]'
+            : 'cursor-pointer text-gray-500 hover:text-[#E8421A]'
         }
       `}
     >

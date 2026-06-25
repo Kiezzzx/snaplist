@@ -118,12 +118,12 @@ export default async function ListingDetailPage({
             )}
 
             <div className="space-y-3">
-              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-500">
                 Brand · Model
               </p>
               <h2 className="text-2xl font-black uppercase tracking-tight md:text-3xl">
                 {brand ?? '—'}
-                {model ? <span className="text-gray-400"> · </span> : null}
+                {model ? <span className="text-gray-500"> · </span> : null}
                 {model ?? ''}
               </h2>
             </div>
@@ -144,7 +144,7 @@ export default async function ListingDetailPage({
             )}
 
             <div className="border-t border-[#D0CFC9] pt-6">
-              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-500">
                 Price
               </p>
               <p className="mt-2 font-mono text-3xl font-bold tabular-nums">
@@ -154,7 +154,7 @@ export default async function ListingDetailPage({
 
             {notes && (
               <div className="border-t border-[#D0CFC9] pt-6">
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-500">
                   Notes
                 </p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">

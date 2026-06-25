@@ -95,7 +95,7 @@ export default async function DashboardPage() {
       <main className="mx-auto max-w-5xl px-4 py-8 md:px-8 md:py-12">
         <header className="mb-8 flex items-end justify-between md:mb-12">
           <h1 className="text-2xl font-bold tracking-tight">Your listings</h1>
-          <p className="font-mono text-[10px] uppercase tracking-widest text-gray-400">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500">
             {rows.length} {rows.length === 1 ? 'item' : 'items'}
           </p>
         </header>
@@ -105,8 +105,8 @@ export default async function DashboardPage() {
         // visual weight on first-load — without it, a single dashed box hugs
         // the top of the viewport and the page reads as broken/empty.
         <div className="flex min-h-[60vh] flex-col items-center justify-center border border-dashed border-[#D0CFC9] px-6 py-16 text-center">
-          <ImageIcon className="mb-8 h-16 w-16 text-gray-300" aria-hidden />
-          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-gray-400">
+          <ImageIcon className="mb-8 h-16 w-16 text-gray-400" aria-hidden />
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-gray-500">
             No listings yet
           </p>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-gray-500">
@@ -193,7 +193,7 @@ export default async function DashboardPage() {
                         This upload didn’t finish processing. Retry to upload the
                         photo again.
                       </p>
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-gray-400">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-gray-500">
                         {dateFmt.format(row.createdAt)}
                       </span>
                     </div>
@@ -250,7 +250,7 @@ export default async function DashboardPage() {
                           {condition}
                         </span>
                       )}
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-gray-400">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-gray-500">
                         {dateFmt.format(row.createdAt)}
                       </span>
                       <span
@@ -261,7 +261,7 @@ export default async function DashboardPage() {
                     </div>
 
                     {/* Row 3: platform indicators */}
-                    <div className="flex items-center gap-4 font-mono text-[9px] tracking-widest text-gray-400">
+                    <div className="flex items-center gap-4 font-mono text-[9px] tracking-widest text-gray-500">
                       {platformIndicators.map(({ key, label }) => {
                         const has = (copies?.[key]?.content ?? '').length > 0;
                         return (

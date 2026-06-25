@@ -149,7 +149,7 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
             value={form.brand}
             onChange={(e) => handleChange('brand', e.target.value)}
             placeholder="e.g. Sony, Apple, IKEA"
-            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-sm placeholder:text-gray-300 focus:border-[#E8421A] focus:outline-none"
+            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-sm placeholder:text-gray-400 focus:border-[#E8421A] focus:outline-none"
           />
         </div>
 
@@ -164,7 +164,7 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
             value={form.model}
             onChange={(e) => handleChange('model', e.target.value)}
             placeholder="e.g. WH-1000XM5, iPhone 14"
-            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-sm placeholder:text-gray-300 focus:border-[#E8421A] focus:outline-none"
+            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-sm placeholder:text-gray-400 focus:border-[#E8421A] focus:outline-none"
           />
         </div>
 
@@ -202,11 +202,11 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
             onFocus={() => setShowSuggested(true)}
             placeholder="Enter your asking price"
             min="0"
-            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-base font-medium placeholder:font-normal placeholder:text-gray-300 focus:border-[#E8421A] focus:outline-none"
+            className="w-full border-0 border-b-2 border-black bg-transparent pb-2 text-base font-medium placeholder:font-normal placeholder:text-gray-400 focus:border-[#E8421A] focus:outline-none"
           />
           {aiData?.suggestedPrice && showSuggested && (
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-[10px] tracking-widest uppercase text-gray-400">
+              <span className="text-[10px] tracking-widest uppercase text-gray-500">
                 AI Estimate:
               </span>
               <button
@@ -216,7 +216,7 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
               >
                 Use AUD ${aiData.suggestedPrice} →
               </button>
-              <span className="text-[9px] text-gray-300 tracking-widest uppercase">
+              <span className="text-[10px] text-gray-500 tracking-widest uppercase">
                 Reference only
               </span>
             </div>
@@ -281,7 +281,7 @@ export function MetadataForm({ aiData, onSubmit, isGenerating, hasGenerated }: M
           </p>
         )}
         {hasGenerated && !isGenerating && !validationError && (
-          <p className="text-[10px] text-gray-400 tracking-widest uppercase mb-2 text-center">
+          <p className="text-[10px] text-gray-500 tracking-widest uppercase mb-2 text-center">
             Edit details above to regenerate
           </p>
         )}

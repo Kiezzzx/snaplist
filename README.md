@@ -119,11 +119,28 @@ These are load-bearing; don't violate them:
 ## Scripts
 
 ```bash
-npm run dev      # dev server
-npm run build    # production build
-npm run start    # serve production build
-npm run lint     # eslint
+npm run dev         # dev server
+npm run build       # production build
+npm run start       # serve production build
+npm run lint        # eslint
+npm test            # vitest unit tests (run once)
+npm run test:watch  # vitest in watch mode
+npx playwright test # end-to-end tests (Chromium)
 ```
+
+## Testing & CI
+
+- **Unit** — [Vitest](https://vitest.dev) (`happy-dom`), specs in `tests/**/*.test.ts`. Covers platform config, validators, and the fail-open rate limiter.
+- **E2E** — [Playwright](https://playwright.dev) (Chromium), specs in `tests/**/*.spec.ts`. These drive the real app and make **live Gemini calls**; the dev server runs with Upstash creds blanked so the suite's uploads aren't blocked by the anonymous rate cap.
+
+CI runs on GitHub Actions (`.github/workflows/playwright.yml`) for every push and PR to `master`, in three sequential jobs:
+
+```
+type-and-lint  ->  unit-tests  ->  e2e-tests
+tsc + eslint       vitest run      playwright (Chromium)
+```
+
+The e2e job needs `DATABASE_URL` and `GOOGLE_GENERATIVE_AI_API_KEY` configured as repository secrets.
 
 ## Deployment
 

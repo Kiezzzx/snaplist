@@ -52,7 +52,7 @@ export function ListingPlatformTabs({ copies }: ListingPlatformTabsProps) {
                 ${
                   isActive
                     ? 'border-b-2 border-black text-black font-semibold'
-                    : 'border-b-2 border-transparent text-gray-400 hover:text-gray-600'
+                    : 'border-b-2 border-transparent text-gray-500 hover:text-gray-600'
                 }
               `}
             >
@@ -81,7 +81,7 @@ export function ListingPlatformTabs({ copies }: ListingPlatformTabsProps) {
               {PLATFORM_META[activeTab].number}
             </span>
             <div>
-              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-400">
+              <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-gray-500">
                 Platform
               </p>
               <p className="text-base font-bold uppercase tracking-tight">
@@ -115,7 +115,7 @@ export function ListingPlatformTabs({ copies }: ListingPlatformTabsProps) {
             </p>
             <div className="mt-6 flex items-center gap-2 border-t border-[#D0CFC9] pt-4">
               <div className="h-2 w-2 bg-green-500" />
-              <span className="font-mono text-[8px] uppercase tracking-[0.2em] text-gray-400">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500">
                 {activeContent.length} characters
               </span>
             </div>
@@ -123,10 +123,10 @@ export function ListingPlatformTabs({ copies }: ListingPlatformTabsProps) {
         ) : (
           <div className="flex flex-col items-center justify-center min-h-60 text-center px-12">
             <div className="w-16 h-px bg-[#D0CFC9] mb-8" />
-            <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-3">
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-3">
               Not Generated
             </p>
-            <p className="text-xs text-gray-300 leading-relaxed max-w-50">
+            <p className="text-sm text-gray-500 leading-relaxed max-w-50">
               No copy has been generated for this platform yet.
             </p>
             <div className="w-16 h-px bg-[#D0CFC9] mt-8" />

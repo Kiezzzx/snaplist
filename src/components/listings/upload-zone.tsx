@@ -116,10 +116,10 @@ export function UploadZone({ onImageProcessed, isExtracting }: UploadZoneProps) 
             <p className="text-sm font-medium text-gray-600 tracking-wide">
               Upload Item Photo
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-sm text-gray-500 mt-1">
               Drag & drop or click to browse
             </p>
-            <p className="text-[10px] tracking-widest text-gray-300 uppercase mt-3">
+            <p className="text-[10px] tracking-widest text-gray-500 uppercase mt-3">
               JPG · PNG · WEBP · HEIC
             </p>
             <button
@@ -151,7 +151,7 @@ export function UploadZone({ onImageProcessed, isExtracting }: UploadZoneProps) 
                 <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-white">
                   {isCompressing ? 'COMPRESSING...' : 'EXTRACTING DATA...'}
                 </p>
-                <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.2em] text-white/50">
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/70">
                   PLEASE WAIT
                 </p>
               </div>

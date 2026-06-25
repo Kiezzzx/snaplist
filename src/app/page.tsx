@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Check } from 'lucide-react';
+import { Check, History } from 'lucide-react';
 import { UploadZone } from '@/components/listings/upload-zone';
 import { MetadataForm } from '@/components/listings/metadata-form';
 import { ListingEditor } from '@/components/listings/listing-editor';
@@ -106,9 +106,10 @@ export default function Home() {
           </div>
           <Link
             href="/dashboard"
-            className="-mr-2 inline-flex min-h-11 items-center px-2 font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500 transition-colors hover:text-[#E8421A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8421A]"
+            className="inline-flex min-h-11 items-center gap-2 border-2 border-black bg-white px-4 font-mono text-[10px] uppercase tracking-[0.15em] text-black shadow-[2px_2px_0_#000] transition-all duration-200 hover:bg-black hover:text-white hover:shadow-[4px_4px_0_#E8421A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8421A] motion-safe:hover:-translate-x-0.5 motion-safe:hover:-translate-y-0.5 md:text-xs"
           >
-            View History →
+            <History className="h-3.5 w-3.5" aria-hidden />
+            View History
           </Link>
         </div>
       </header>
@@ -194,7 +195,7 @@ export default function Home() {
                       ${
                         isActive
                           ? 'border-b-2 border-black text-black font-semibold'
-                          : 'border-b-2 border-transparent text-gray-400 hover:text-gray-600'
+                          : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700'
                       }
                     `}
                   >
