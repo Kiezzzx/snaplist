@@ -20,6 +20,124 @@ AI-powered second-hand listing generator. Upload a photo, get platform-specific 
 3. **Review** — User edits the AI-prefilled form. Edits are sticky; late AI responses never overwrite user input (`DirtyState`).
 4. **Generate** — Three parallel text streams (`text/plain`) produce platform-specific copy with isolated state per tab.
 
+## Architecture
+
+Snaplist runs entirely on Vercel's platform, split across three runtime tiers — the
+**browser**, the **Edge runtime**, and the **Node serverless runtime** — with all
+paid/stateful dependencies (Gemini, Upstash, Neon) kept strictly behind the
+serverless boundary. Nothing that holds a secret or a DB handle is ever reachable
+from the client.
+
+```mermaid
+flowchart TB
+    subgraph client["🖥️ Client — Browser (React 19)"]
+        direction TB
+        UP["UploadZone<br/>compressAndConvertToBase64<br/>webp · ≤1024px · &lt;3MB"]
+        FORM["MetadataForm<br/>React state + DirtyState<br/>(user edits always win)"]
+        HOOK["useListingGeneration<br/>orchestration only —<br/>never touches stream content"]
+        subgraph editors["Per-platform stream isolation (constraint #3)"]
+            direction LR
+            E1["ListingEditor<br/>Facebook<br/>useCompletion"]
+            E2["ListingEditor<br/>eBay<br/>useCompletion"]
+            E3["ListingEditor<br/>Rednote<br/>useCompletion"]
+        end
+    end
+
+    subgraph edge["⚡ Vercel Edge Runtime"]
+        MW["middleware.ts<br/>issues anon_session_id<br/>httpOnly · SameSite=Lax<br/>(no server-only imports)"]
+    end
+
+    subgraph serverless["☁️ Vercel Serverless — Node runtime · 'server-only'"]
+        direction TB
+        EX["POST /api/extract<br/>413 guard → rate limit → AI"]
+        SHARP["sharp thumbnail<br/>(parallel with AI)"]
+        GEN["POST /api/generate<br/>streamText → ReadableStream"]
+        ACT["server actions<br/>create / persist / mark"]
+        AFTER["after() — persist copy<br/>post-response"]
+    end
+
+    subgraph third["🔌 Third-party services"]
+        GEM["Google Gemini<br/>3.1 Flash-Lite<br/>vision + text"]
+        UPS["Upstash Redis<br/>sliding-window<br/>fail-open"]
+        NEON["Neon Postgres<br/>Drizzle ORM"]
+    end
+
+    %% session gate — every request first passes the Edge
+    UP -.->|"HTTPS (cookie set on 1st hit)"| MW
+    MW -.->|anon_session_id| EX
+    MW -.->|anon_session_id| GEN
+
+    %% extract path
+    FORM -->|"base64 image"| EX
+    EX -->|checkRateLimit| UPS
+    EX -->|extractProductMetadata| GEM
+    EX --> SHARP
+    EX -->|createListing| ACT
+    ACT --> NEON
+    EX -->|"{ dbId, metadata }"| FORM
+
+    %% generate path (isolated per platform)
+    FORM --> HOOK
+    HOOK -->|triggerId| E1 & E2 & E3
+    E1 & E2 & E3 -->|"POST {prompt, platform, dbId}"| GEN
+    GEN -->|streamText| GEM
+    GEM -.->|tokens| GEN
+    GEN ==>|"text/plain token stream"| E1 & E2 & E3
+    GEN --> AFTER
+    AFTER -->|persistGeneratedCopy| NEON
+```
+
+### Streaming lifecycle (`/api/generate`)
+
+The generate route deliberately **awaits the first token before committing to
+HTTP 200**, so a Gemini `429`/`503` surfaces as a real error status instead of a
+truncated 200. Persistence happens *after* the client has the full stream, via
+`after()`, and is skipped on mid-stream failure so partial copy never gets saved
+as "the listing".
+
+```mermaid
+sequenceDiagram
+    participant C as ListingEditor (client)
+    participant G as /api/generate (serverless)
+    participant AI as Gemini 3.1 Flash-Lite
+    participant DB as Neon Postgres
+
+    C->>G: POST { prompt, platform, dbId }
+    G->>AI: streamText(system + prompt)
+    AI-->>G: first token (awaited before 200)
+    G-->>C: 200 text/plain — stream opens
+    loop each token
+        AI-->>G: token
+        G-->>C: token (rendered live)
+    end
+    Note over G,DB: after() runs post-response
+    G->>DB: persistGeneratedCopy(dbId, platform, copy)
+```
+
+### Data-flow boundaries & isolation
+
+The diagram's tiers are enforced boundaries, not just visual grouping:
+
+- **Client → network (compression boundary).** Images are compressed to webp
+  (≤1024px, `<3MB`) *in the browser* before they ever hit the wire; the server
+  re-checks and rejects anything over 4.5MB with a `413` before spending Sharp or
+  Gemini cycles.
+- **Edge ↔ serverless.** `middleware.ts` runs on the Edge runtime and issues the
+  `anon_session_id` cookie for every visitor. It **cannot import the `server-only`
+  module graph** (DB, AI, session), so the cookie name is duplicated as a literal
+  rather than imported — this keeps the Edge bundle free of Node-only code.
+- **`server-only` secret boundary.** The Gemini key, Neon connection, and Upstash
+  client all live in modules marked `'server-only'`, so they are never bundled into
+  client code. The browser only ever sees JSON metadata and token text.
+- **Per-platform stream isolation (constraint #3, #5).** Each `<ListingEditor>`
+  owns its own `useCompletion` stream. `useListingGeneration` coordinates lifecycle
+  (a `triggerId` restart signal + an aggregate status map) but **never reads or
+  writes stream content** — so one platform failing or being aborted can't poison
+  the copy of its siblings.
+- **Fail-open rate limiting.** Upstash is consulted *after* the cheap local guards
+  but *before* Gemini. If Redis is slow or down, the limiter resolves as *allowed* —
+  a rate-limiter outage must never take down a core upload.
+
 ## Tech stack
 
 - **Next.js 16** (App Router) + React 19
