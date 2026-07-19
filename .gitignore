@@ -45,6 +45,10 @@ next-env.d.ts
 CLAUDE.md
 AGENTS.md
 
+# codegraph (local code-intelligence index)
+.codegraph/
+symbols.json
+
 # Playwright
 node_modules/
 /test-results/

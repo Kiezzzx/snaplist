@@ -103,8 +103,6 @@ export function ListingEditor({
     if (triggerId === activeTriggerRef.current) return; // dedupe StrictMode double-fires
     activeTriggerRef.current = triggerId;
 
-    console.log(`${platform}: triggering generation`, { triggerId });
-
     // Reset content + cancel any in-flight request from a previous trigger
     if (completion) {
       // eslint-disable-next-line react-hooks/set-state-in-effect

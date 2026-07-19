@@ -17,8 +17,6 @@ export async function POST(request: Request): Promise<Response> {
     const platform = body.platform;
     const dbId = body.dbId;
 
-    console.log('Generate request:', { platform, dbId, promptLength: prompt?.length });
-
     if (!prompt || !platform || !dbId) {
       return Response.json(
         { error: 'Missing prompt, platform, or dbId' },

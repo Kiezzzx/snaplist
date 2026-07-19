@@ -99,7 +99,6 @@ export function useListingGeneration(dbId: string | null): UseListingGenerationR
   );
 
   const handleStatusChange = useCallback((platform: Platform, status: string) => {
-    console.log(`${platform}: ${status}`);
     setPlatformStatuses((prev) => {
       const next = { ...prev, [platform]: status };
       // Read selectedPlatforms via ref to avoid stale-closure mistakes
