@@ -4,10 +4,11 @@ import { z } from 'zod';
 import { sql, eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-import { listings, type ListingMetadata } from '@/lib/db/schema';
+import { listings } from '@/lib/db/schema';
 import { listingMetadataSchema } from '@/lib/db/validators';
 import { getAnonSessionId } from '@/lib/session';
-import type { Platform } from '@/lib/types';
+import { productMetadataSchema, type ProductMetadata, type Platform } from '@/lib/types';
+import { toListingMetadata } from '@/lib/metadata';
 
 export type CreateListingInput = z.infer<typeof listingMetadataSchema>;
 
@@ -55,21 +56,6 @@ export async function createListing(
   return row.id;
 }
 
-// Mirrors ProductMetadata (the form's shape) for the boundary parse. The form
-// carries price as a string and a separate AI `suggestedPrice` reference; the
-// DB stores a single numeric price in `suggestedPrice`.
-const formMetadataSchema = z.object({
-  category: z.string(),
-  brand: z.string(),
-  model: z.string(),
-  condition: z.string(),
-  price: z.string(),
-  suggestedPrice: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-export type UpdateListingMetadataInput = z.infer<typeof formMetadataSchema>;
-
 // Persists the user's reviewed/edited metadata onto the row at generate time.
 // Until this runs, listings.metadata holds only the AI's extraction-time values
 // (written by createListing), so any field the user corrected — condition,
@@ -77,35 +63,15 @@ export type UpdateListingMetadataInput = z.infer<typeof formMetadataSchema>;
 // "Review & Smart Merge": what the user generates with is what we save.
 export async function updateListingMetadata(
   id: string,
-  metadata: UpdateListingMetadataInput,
+  metadata: ProductMetadata,
 ): Promise<void> {
   const sessionId = await getAnonSessionId();
   if (!sessionId) return;
 
-  const parsed = formMetadataSchema.parse(metadata);
-
-  // The user's asking price (form.price) is what the dashboard renders as
-  // "Price"; fall back to the AI estimate only when they left it blank. Blank /
-  // non-numeric → omit so the JSONB stays clean rather than storing NaN.
-  const askingPrice = Number(parsed.price);
-  const aiEstimate = Number(parsed.suggestedPrice);
-  const price =
-    Number.isFinite(askingPrice) && askingPrice > 0
-      ? askingPrice
-      : Number.isFinite(aiEstimate) && aiEstimate > 0
-        ? aiEstimate
-        : undefined;
-
-  // Empty optional text → undefined so the dashboard's `?? '—'` fallbacks fire
-  // instead of rendering blank cells.
-  const dbMetadata: ListingMetadata = {
-    category: parsed.category || undefined,
-    brand: parsed.brand || undefined,
-    model: parsed.model || undefined,
-    condition: parsed.condition || undefined,
-    notes: parsed.notes || undefined,
-    ...(price !== undefined ? { suggestedPrice: price } : {}),
-  };
+  // Re-parse at the boundary with the form shape's runtime guard, then map to the
+  // DB shape via the shared mapper — the same one /api/extract uses — so the
+  // price-fallback + empty-cleaning rules stay identical across both write paths.
+  const dbMetadata = toListingMetadata(productMetadataSchema.parse(metadata));
 
   // Scope to the caller's session so one visitor can't rewrite another's row.
   // Only the metadata column is touched — generatedCopies and status are owned

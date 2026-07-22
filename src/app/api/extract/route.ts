@@ -4,7 +4,7 @@ import { createListing } from '@/lib/actions/listings';
 import { extractProductMetadata } from '@/lib/ai/extract-metadata';
 import { getAnonSessionId } from '@/lib/session';
 import { checkRateLimit, getClientIdentifier } from '@/lib/ratelimit';
-import type { ListingMetadata } from '@/lib/db/schema';
+import { toListingMetadata } from '@/lib/metadata';
 
 const MAX_PAYLOAD_BYTES = 4.5 * 1024 * 1024;
 
@@ -89,16 +89,19 @@ export async function POST(request: Request): Promise<Response> {
 
     const data: Partial<ProductMetadata> = { ...object, notes: '' };
 
-    // AI returns suggestedPrice as a string ('180'); DB column is number.
-    // Empty/non-numeric → omit so the JSONB stays clean rather than storing NaN.
-    const priceNum = Number(object.suggestedPrice);
-    const dbMetadata: ListingMetadata = {
+    // Map the AI prefill to the DB shape through the shared form→DB mapper (the
+    // same one updateListingMetadata uses), so the price-fallback + empty-cleaning
+    // rules stay identical across both write paths. There's no user asking-price
+    // yet, so price starts blank and the mapper falls back to the AI estimate.
+    const dbMetadata = toListingMetadata({
       category: object.category,
       brand: object.brand,
       model: object.model,
       condition: object.condition,
-      ...(Number.isFinite(priceNum) && priceNum > 0 ? { suggestedPrice: priceNum } : {}),
-    };
+      price: '',
+      suggestedPrice: object.suggestedPrice,
+      notes: '',
+    });
 
     const dbId = await createListing(dbMetadata, { thumbnailBase64 });
 
