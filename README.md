@@ -1,6 +1,93 @@
 # Snaplist
 
-AI-powered second-hand listing generator. Upload a photo, get platform-specific listing copy for **Facebook Marketplace**, **eBay**, and **Rednote**  — written in the right tone, in the right language.
+[![CI](https://github.com/Kiezzzx/snaplist/actions/workflows/playwright.yml/badge.svg)](https://github.com/Kiezzzx/snaplist/actions/workflows/playwright.yml)
+
+AI-powered second-hand listing generator. Upload a photo, get platform-specific listing copy for **Facebook Marketplace**, **eBay**, and **Rednote** — written in the right tone, in the right language.
+
+**▶ [Try the live demo](https://snaplist-theta.vercel.app)** — no sign-up, just upload a photo.
+
+![Snaplist — a running-shoe photo on the left with AI-extracted item details, and generated Facebook Marketplace copy streaming on the right](docs/screenshots/hero-facebook.png)
+
+---
+
+## One photo, three platforms
+
+Each platform has its own system prompt tuned to that marketplace's conventions —
+conversational English for Facebook, structured SEO for eBay, concise Mandarin for
+Rednote. All three stream **in parallel**, each in its own isolated state, so one
+platform failing never poisons the others.
+
+**eBay** — SEO title, item specifics, and a dispute-proof condition summary:
+
+![eBay output: SEO title, condition summary, item specifics and detailed description for the same shoes](docs/screenshots/platform-ebay.png)
+
+**Rednote (小红书)** — the same item in Simplified Chinese: concise, factual, and
+deliberately free of influencer filler:
+
+![Rednote output in Simplified Chinese, with price, condition bullets, pickup terms and hashtags](docs/screenshots/platform-rednote.png)
+
+## Listing history
+
+Every generation is persisted to Postgres and scoped to your anonymous session —
+no login required.
+
+![Dashboard showing five saved listings with thumbnails, prices, and per-platform generation status](docs/screenshots/dashboard.png)
+
+Each listing keeps its reviewed metadata and all three generated copies, viewable
+from a detail page.
+
+## Responsive
+
+The two-column desktop layout collapses to a single stacked column on mobile, with
+the platform tabs becoming horizontally scrollable.
+
+<img src="docs/screenshots/mobile.png" width="280" alt="Snaplist on a phone — the upload zone and item-details form stacked vertically">
+
+---
+
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Framework | **Next.js 16** (App Router) + **React 19** |
+| Language | **TypeScript**, strict mode |
+| Styling | **Tailwind CSS v4** + shadcn/ui |
+| AI | **Vercel AI SDK** + **Google Gemini 3.1 Flash-Lite** (vision + text) |
+| Database | **Neon Postgres** + **Drizzle ORM** |
+| Rate limiting | **Upstash Redis** — sliding window, fail-open |
+| Validation | **Zod** — one schema per boundary, types derived via `z.infer` |
+| Testing | **Vitest** (unit) + **Playwright** (e2e), run in GitHub Actions |
+
+## Engineering highlights
+
+The interesting parts of this project aren't the CRUD — they're the failure paths.
+
+- **Streaming errors surface as real HTTP status codes.** `/api/generate` awaits the
+  first token *before* committing to `200`, so a Gemini `429`/`503` returns a proper
+  error status instead of a truncated success. If a stream dies mid-flight — after
+  `200` is already sent and the status can no longer change — it appends a visible
+  sentinel rather than silently truncating and labelling partial copy "complete".
+- **Fail-open rate limiting.** If Upstash is slow or unreachable, `checkRateLimit`
+  resolves as *allowed*. A limiter outage must never take down a core upload; the
+  guard is protective, not load-bearing. Unit-tested for both the throwing and the
+  unconfigured case.
+- **User edits always win.** `DirtyState` marks every field the user has touched, so
+  a late `/api/extract` response can never overwrite something they typed.
+- **Per-platform stream isolation.** Each `<ListingEditor>` owns its own stream.
+  `useListingGeneration` coordinates lifecycle (restart signal, aggregate status)
+  but never reads or writes stream content — so one platform failing or being
+  aborted cannot poison its siblings.
+- **Secrets are excluded at compile time, not by convention.** The Gemini key, Neon
+  client, and Upstash client all sit behind `'server-only'`. The Edge middleware
+  duplicates the session-cookie name as a literal instead of importing it, keeping
+  the Node-only module graph out of the Edge bundle.
+- **Concurrent writes merge atomically.** Three parallel platform writes target the
+  same row, so `persistGeneratedCopy` merges with
+  `COALESCE(...) || fragment::jsonb` inside the row lock — no read-modify-write
+  window where one platform's copy overwrites another's.
+- **Reads re-validate at the boundary.** Drizzle's `$type<>` is compile-time only, so
+  both dashboard pages `safeParse` JSONB through shared Zod schemas; a historical row
+  with a drifted shape degrades gracefully instead of crashing the render.
 
 ---
 
@@ -138,17 +225,6 @@ The diagram's tiers are enforced boundaries, not just visual grouping:
   but *before* Gemini. If Redis is slow or down, the limiter resolves as *allowed* —
   a rate-limiter outage must never take down a core upload.
 
-## Tech stack
-
-- **Next.js 16** (App Router) + React 19
-- **TypeScript** strict mode
-- **Tailwind CSS v4** + shadcn/ui
-- **Vercel AI SDK** + **Google Gemini 3.1 Flash-Lite** (vision + text)
-- **Neon Postgres** + **Drizzle ORM** — listings persistence + dashboard history
-- **Upstash Redis** — daily rate limiting (fail-open if unconfigured)
-- `browser-image-compression` for client-side compression
-- `zod` for structured output validation
-
 ## Getting started
 
 ```bash
@@ -264,9 +340,17 @@ The e2e job needs `DATABASE_URL` and `GOOGLE_GENERATIVE_AI_API_KEY` configured a
 
 Deploy to Vercel. Set `GOOGLE_GENERATIVE_AI_API_KEY` in project env vars.
 
-## Status
+## Status & roadmap
 
-Single image upload with Neon Postgres persistence and a dashboard (listing
-history, detail view, delete). Auth is anonymous (session cookie) — no login
-yet. Object storage uses an inline base64 thumbnail placeholder; Cloudflare R2
-and Auth.js (OAuth + anonymous-listing claim) are the next phase.
+**Working today** — single-image upload, Gemini Vision extraction, parallel
+three-platform generation with live streaming, Postgres persistence, and an
+anonymous-session dashboard (history, detail view, delete).
+
+Known trade-offs, made deliberately to ship an MVP:
+
+| Next up | Why it's not done yet |
+|---|---|
+| **Cloudflare R2 object storage** | Thumbnails are currently inline base64 in Postgres — a knowingly temporary placeholder. The `originalImageKey` / `thumbnailKey` columns and the two-phase delete (R2 objects before the DB row, so a failed delete can't orphan billable objects) are already stubbed for the cutover. |
+| **Auth.js (OAuth) + anonymous claim** | Anonymous sessions work end to end; signing in should migrate a visitor's existing listings to their user id. The authenticated 20/day rate-limit tier is already implemented but currently unreachable. |
+| **Structured logging & error reporting** | Server errors go to `console.error` only — fine for a demo, not for production triage. |
+| **Deterministic e2e** | The Playwright suite makes live Gemini calls, which makes CI slower and occasionally flaky on model quota. |
